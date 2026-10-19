@@ -60,6 +60,14 @@ textarea { resize: vertical; }
 .thread { display: grid; gap: 6px; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px; font-size: .88rem; }
 .thread ol { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; }
 .thread .row { justify-content: space-between; }
+.convs { display: grid; gap: 6px; }
+.convs .list { display: flex; flex-wrap: wrap; gap: 6px; }
+.conv { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: .85rem; max-width: 100%; }
+.conv button { font: inherit; background: none; border: 0; color: var(--ink); cursor: pointer; padding: 5px 4px 5px 11px; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.conv button.x { padding: 5px 10px 5px 4px; color: var(--muted); }
+.conv[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.conv small { color: var(--muted); font-weight: 400; }
+#clientName { flex: 1 1 160px; min-width: 0; font: inherit; font-size: .9rem; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 5px 11px; border-radius: 999px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -127,13 +135,17 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
         </div>
       </div>
       <input type="file" id="ocrFile" accept="image/*" hidden>
+      <div class="convs" id="convs" hidden>
+        <b>Clientes en espera</b>
+        <div class="list" id="convList"></div>
+      </div>
       <div class="thread" id="thread" hidden>
-        <div class="row"><b>Conversación guardada</b><button class="btn link" id="clearThread" type="button">Borrar conversación</button></div>
+        <div class="row"><b id="threadName">Conversación</b><button class="btn link" id="clearThread" type="button">Terminar y borrar</button></div>
         <ol id="threadList"></ol>
         <div class="status">Pega abajo lo que respondió el cliente: la respuesta tiene en cuenta todo lo anterior.</div>
       </div>
       <textarea id="q" rows="3" placeholder="Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?"></textarea>
-      <div class="row"><button class="btn" id="saveQ" type="button">Guardar pregunta y esperar respuesta</button></div>
+      <div class="row"><input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" autocomplete="off"><button class="btn" id="saveQ" type="button">Guardar y esperar respuesta</button></div>
       <div class="status" id="ocrStatus"></div>
     </div>
 
@@ -1006,17 +1018,17 @@ const Engine = (() => {
       if (pi >= 0) product = cleanProduct(L[pi]);
     }
     const ai = L.findIndex((l) => ANCHOR.test(l));
-    let question = "";
+    let question = "", buyer = "";
     if (ai > 0) {
       let start = 0;
-      for (let i = ai - 1; i >= 0; i--) if (BUYER.test(L[i]) || PROD_ROW.test(L[i])) { start = i + 1; break; }
+      for (let i = ai - 1; i >= 0; i--) if (BUYER.test(L[i]) || PROD_ROW.test(L[i])) { start = i + 1; if (BUYER.test(L[i])) buyer = L[i].split("(")[0].replace(/[^\p{L}\p{N} ._-]/gu, "").trim(); break; }
       question = L.slice(start, ai).map(cleanQuestion).filter((l) => l.length > 3).join(" ");
     }
     if (!question) {
       const hi = L.findIndex((l) => /hace\s+\d+\s*(minutos?|horas?|d[ií]as?)|apur[aá]te/i.test(l));
       question = hi >= 0 ? cleanQuestion(L[hi]) : cleanQuestion(extractQuestion(L.join("\n")));
     }
-    return { question, product };
+    return { question, product, buyer };
   }
 
   return { engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
@@ -1158,14 +1170,48 @@ const Engine = (() => {
     return { L, it: it || null };
   }
   let fichas = store.get("fichas", {});
-  // Conversación: preguntas anteriores del mismo cliente, se suman a la nueva para no perder el contexto
-  let thread = store.get("thread", []);
-  const fullQ = () => [...thread, $("q").value].filter((x) => x.trim()).join("\n");
+  // Conversaciones: cada cliente en espera guarda sus mensajes (y la publicación) para no perder el contexto
+  let convs = store.get("convs", []);
+  const oldThread = store.get("thread", []);
+  if (oldThread.length) { convs.push({ id: Date.now(), name: "Cliente 1", msgs: oldThread, ts: Date.now() }); store.set("convs", convs); store.set("thread", []); }
+  let activeId = store.get("convActive", null);
+  const activeConv = () => convs.find((c) => c.id === activeId) || null;
+  const saveConvs = () => { store.set("convs", convs); store.set("convActive", activeId); };
+  const fullQ = () => [...((activeConv() || {}).msgs || []), $("q").value].filter((x) => x.trim()).join("\n");
+  const agoTxt = (ts) => { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? "recién" : m < 60 ? "hace " + m + " min" : m < 1440 ? "hace " + Math.round(m / 60) + " h" : "hace " + Math.round(m / 1440) + " d"; };
   function renderThread() {
-    $("thread").hidden = !thread.length;
+    const c = activeConv();
+    $("thread").hidden = !c;
+    $("threadName").textContent = c ? "Conversación con " + c.name : "";
     const ol = $("threadList"); ol.textContent = "";
-    thread.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ol.append(li); });
-    $("q").placeholder = thread.length ? "Pega aquí la respuesta del cliente. Ej: es 2015, motor 1.6" : "Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?";
+    (c ? c.msgs : []).forEach((t) => { const li = document.createElement("li"); li.textContent = t; ol.append(li); });
+    $("q").placeholder = c ? "Pega aquí lo que respondió " + c.name + ". Ej: es 2015, motor 1.6" : "Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?";
+    $("clientName").hidden = !!c;
+    $("convs").hidden = !convs.length;
+    const list = $("convList"); list.textContent = "";
+    convs.forEach((cv) => {
+      const w = document.createElement("span"); w.className = "conv"; w.setAttribute("aria-current", String(cv.id === activeId));
+      const open = document.createElement("button"); open.type = "button";
+      open.title = cv.msgs.join(" / ");
+      open.append(cv.name + " ");
+      const sm = document.createElement("small"); sm.textContent = "· " + agoTxt(cv.ts); open.append(sm);
+      open.addEventListener("click", () => openConv(cv.id === activeId ? null : cv.id));
+      const x = document.createElement("button"); x.type = "button"; x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Borrar conversación con " + cv.name);
+      x.addEventListener("click", () => deleteConv(cv.id));
+      w.append(open, x); list.append(w);
+    });
+  }
+  function openConv(id) {
+    activeId = id; saveConvs();
+    const c = activeConv();
+    $("q").value = "";
+    state.listing = c ? c.listing || "" : ""; state.listingKey = c ? c.listingKey || null : null;
+    state.prodManual = false; state.prodKey = null; $("framCode").value = ""; state.framVehKey = null;
+    renderThread(); analyze(); $("q").focus();
+  }
+  function deleteConv(id) {
+    convs = convs.filter((c) => c.id !== id); if (activeId === id) activeId = null;
+    saveConvs(); renderThread(); analyze();
   }
 
   function update() {
@@ -1332,14 +1378,26 @@ const Engine = (() => {
     if (!v) { toast("No hay vehículo para copiar."); return; }
     try { await navigator.clipboard.writeText(v.label); toast("Copiado: " + v.label); } catch { toast(v.label); }
   });
+  // Guardar: el mensaje se suma a la conversación del cliente y la pantalla queda libre para el próximo
   $("saveQ").addEventListener("click", () => {
     const t = $("q").value.trim();
     if (!t) { toast("Primero pega la pregunta del cliente."); return; }
-    thread.push(t); store.set("thread", thread); $("q").value = ""; renderThread(); analyze(); $("q").focus();
-    toast("Guardada. Cuando el cliente responda, pégalo abajo.");
+    let c = activeConv();
+    if (c) { c.msgs.push(t); c.ts = Date.now(); }
+    else {
+      const v = E.extractVehicle(t);
+      const name = $("clientName").value.trim() || state.buyer || (v && v.model ? v.label : "") || "Cliente " + (convs.length + 1);
+      c = { id: Date.now(), name, msgs: [t], ts: Date.now() }; convs.push(c);
+    }
+    c.listing = state.listing; c.listingKey = state.listingKey;
+    $("clientName").value = ""; state.buyer = "";
+    activeId = null; saveConvs();
+    $("q").value = ""; state.listing = ""; state.listingKey = null; state.prodKey = null; state.prodManual = false; $("framCode").value = "";
+    renderThread(); analyze(); $("q").focus();
+    toast("Guardada: " + c.name + ". Cuando responda, tocá su nombre en Clientes en espera.");
   });
-  $("clearThread").addEventListener("click", () => { thread = []; store.set("thread", thread); renderThread(); analyze(); });
-  $("clearQ").addEventListener("click", () => { thread = []; store.set("thread", thread); renderThread(); $("q").value = ""; $("framCode").value = ""; state.framVehKey = null; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
+  $("clearThread").addEventListener("click", () => { const c = activeConv(); if (c) deleteConv(c.id); });
+  $("clearQ").addEventListener("click", () => { activeId = null; saveConvs(); state.buyer = ""; renderThread(); $("q").value = ""; $("framCode").value = ""; state.framVehKey = null; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
   $("another").addEventListener("click", () => { state.seed++; update(); });
 
   async function copyText(text) {
@@ -1418,7 +1476,11 @@ const Engine = (() => {
         rows.push(...lines2.filter((l) => E.PROD_ROW.test(l)));
         if (lines2.some((l) => E.ANCHOR.test(l)) || !lines.some((l) => E.ANCHOR.test(l))) lines = lines2;
       }
-      const { question, product } = E.parseScreenshot(lines);
+      const { question, product, buyer } = E.parseScreenshot(lines);
+      // Si ese cliente ya tiene una conversación en espera, se abre sola
+      const prev = buyer && convs.find((c) => E.norm(c.name) === E.norm(buyer));
+      if (prev && prev.id !== activeId) { openConv(prev.id); toast("Conversación con " + prev.name + " abierta."); }
+      state.buyer = buyer || "";
       $("q").value = question;
       // La fila del producto suele leerse con errores: se prueba cada lectura contra el catálogo y gana la mejor
       let best = null;
