@@ -1,4 +1,6 @@
-# Respondedor grig
+<img src="img/logo.svg" alt="Renova" width="320">
+
+# Respondedor Renova
 
 App para responder rápido las preguntas de Mercado Libre de la tienda **grig** (aceites, refrigerantes y filtros). Funciona sin IA y sin VPN.
 

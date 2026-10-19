@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 110" role="img" aria-label="Renova">
+  <g transform="translate(5 5)">
+    <rect width="100" height="100" rx="22" fill="#111111"/>
+    <path d="M50 8 C50 8 19 43 19 63 A31 31 0 0 0 81 63 C81 43 50 8 50 8 Z" fill="#FF7A00"/>
+    <path d="M62.1 56 A14 14 0 1 1 49 49" fill="none" stroke="#111111" stroke-width="6.5" stroke-linecap="round"/>
+    <path d="M58 49 L47.5 42 L47.5 56 Z" fill="#111111" stroke="#111111" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <text x="124" y="72" textLength="262" lengthAdjust="spacingAndGlyphs" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="60" fill="#111111">RENOVA</text>
+  <rect x="126" y="84" width="260" height="7" rx="3.5" fill="#FF7A00"/>
+</svg>

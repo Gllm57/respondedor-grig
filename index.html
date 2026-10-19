@@ -6,13 +6,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Respondedor">
 <meta name="theme-color" content="#c27a00">
-<title>Respondedor grig</title>
+<title>Renova · Respondedor</title>
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon-512.png">
+<meta name="theme-color" content="#111111">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
 /* Una columna de trabajo: pregunta -> lo que detectó -> respuesta; pestañas para catálogo, vehículos y ajustes */
 :root {
   --bg: #eef0f2; --surface: #ffffff; --ink: #1b2229; --muted: #5d6873; --line: #d5dade;
-  --accent: #c27a00; --accent-ink: #ffffff; --accent-soft: #fbefd9; --coolant: #0f8a7e; --warn: #b5481f;
+  --accent: #e06a00; --accent-ink: #ffffff; --accent-soft: #ffeedd; --coolant: #0f8a7e; --warn: #b5481f;
   --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -21,7 +24,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12161a; --surface: #1b2127; --ink: #e8ecef; --muted: #9aa5af; --line: #2d353d;
-    --accent: #f0a429; --accent-ink: #1a1204; --accent-soft: #33270f; --coolant: #3cc2b3; --warn: #f07a4f;
+    --accent: #ff8a1f; --accent-ink: #1a0d00; --accent-soft: #3a2410; --coolant: #3cc2b3; --warn: #f07a4f;
     color-scheme: dark;
   }
 }
@@ -32,7 +35,9 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
 .wrap { max-width: 760px; margin: 0 auto; padding-block: max(14px, env(safe-area-inset-top)) 48px; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); display: grid; gap: 14px; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; line-height: 1; margin: 0; }
-h1 span { color: var(--accent); }
+h1 { white-space: nowrap; }
+h1 span { color: var(--accent); font-size: .62em; font-weight: 600; letter-spacing: .02em; }
+h1 .logo { width: 1.6em; height: 1.6em; vertical-align: middle; margin-right: .4em; border-radius: 22%; }
 h2 { font-family: var(--display); font-size: 1.05rem; letter-spacing: .08em; text-transform: uppercase; margin: 0; color: var(--muted); }
 nav.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 4px; overflow-x: auto; }
 nav.tabs button { flex: 1 1 auto; font: inherit; font-weight: 600; font-size: .88rem; background: none; border: 0; color: var(--muted); padding: 8px 6px; border-radius: 7px; cursor: pointer; }
@@ -93,7 +98,7 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
 <body>
 <div class="wrap">
   <header>
-    <h1>Respondedor <span>grig</span></h1>
+    <h1><img class="logo" src="img/icon.svg" alt="">Renova <span>Respondedor</span></h1>
     <span class="hint" id="catBadge"></span>
   </header>
 
