@@ -24,7 +24,7 @@ App para responder rápido las preguntas de Mercado Libre de la tienda **grig** 
 
 Abre el link en Safari → botón Compartir → **Agregar a pantalla de inicio**.
 
-Todo lo que cargas (catálogo, vehículos, respuestas) se guarda en el navegador de cada dispositivo. Para pasarlo a otro, usa **Descargar respaldo** y **Cargar respaldo** en la pestaña Catálogo.
+Todo lo que cargas (catálogo, vehículos, respuestas) se guarda en el navegador de cada dispositivo. Para pasarlo a otro, usa **Descargar respaldo** y **Cargar respaldo** en la pestaña Ajustes.
 
 ## Datos de vehículos
 
