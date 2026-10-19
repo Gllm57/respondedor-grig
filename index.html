@@ -310,6 +310,8 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
       <div class="field"><label for="sOriginal">Originalidad y vencimiento</label><textarea id="sOriginal" rows="2"></textarea></div>
       <div class="field"><label for="sDevolucion">Cambios y devoluciones</label><textarea id="sDevolucion" rows="2"></textarea></div>
       <div class="field"><label for="sPostventa">Consultas después de la compra</label><textarea id="sPostventa" rows="2"></textarea></div>
+      <div class="field"><label for="sReclamo">Producto que llegó mal (golpeado, roto, equivocado)</label><textarea id="sReclamo" rows="2"></textarea></div>
+      <div class="field"><label for="sRetiro">Retiro en persona / dirección</label><textarea id="sRetiro" rows="2"></textarea></div>
       <button class="btn link" id="resetSettings" type="button">Volver a los textos originales</button>
     </div>
     <div class="panel">
@@ -347,18 +349,23 @@ const Engine = (() => {
 
   const INTENTS = [
     { key: "compat", label: "Compatibilidad", re: /(sirve|sirven|le va|va (para|bien|en)|compatib|corresponde|es para|anda (para|en|bien)|puedo (usar|poner|ponerle)|lo uso|le pongo|para mi |motor \d|que lleva|lleva (mi|el))/ },
-    { key: "litros", label: "Litros", re: /(cuant[oa]s? (litros|bidones|botellas|lleva)|cuanto aceite|capacidad|alcanza|cantidad de aceite|me alcanza|necesito \d+ ?(l|lts|litros))/ },
+    { key: "litros", label: "Litros", re: /(cuant[oa]s? (litros|bidones|botellas|lleva|necesito|compro|hacen falta)|cuanto aceite|capacidad|alcanza|cantidad de aceite|me alcanza|necesito \d+ ?(l|lts|litros))/ },
     { key: "stock", label: "Stock", re: /(stock|disponib|\btenes\b|\btienen\b|tendr[aá][sn]?\b|tendrian|\btenga[ns]?\b|\bhay\b|queda|entrega inmediata|lo tenes|lo tienen|siguen? (teniendo|vendiendo))/ },
     { key: "recomendar", label: "Recomendación", re: /(recomend|aconsej|cual (me )?(conviene|es mejor|uso|usar|lleva)|que aceite|diferencia|mejor opcion|cual es el mejor|sintetico o|semi ?sintetico o|mineral o)/ },
     { key: "precio", label: "Precio", re: /(precio|cuanto (sale|cuesta|esta|vale)|descuento|por mayor|mayorista|si llevo|varias|\d+ unidades|oferta|rebaja|mejor precio|cantidad)/ },
     { key: "pago", label: "Pagos", re: /(cuotas|tarjeta|efectivo|transferencia|mercado ?pago|forma de pago|medios de pago)/ },
-    { key: "envio", label: "Envío", re: /(envio|envias|envian|llega|demora|tarda|retir|domicilio|correo|full|flete|mandan|mandas|despach|cuando sale|hoy|manana|zona|codigo postal|cp \d)/ },
+    { key: "envio", label: "Envío", re: /(envio|envias|envian|llega|demora|tarda|domicilio|correo|full|flete|mandan|mandas|despach|cuando sale|hoy|manana|zona|codigo postal|cp \d)/ },
     { key: "factura", label: "Factura", re: /factura/ },
-    { key: "original", label: "Original", re: /(original|trucho|falsific|vencimiento|fecha de (venc|fabric)|sellad|\bnuevo\b|lote|partida)/ },
+    { key: "original", label: "Original", re: /(original|trucho|falsific|vencimiento|\bvence|vencid|fecha de (venc|fabric)|sellad|\bnuevo\b|lote|partida)/ },
     { key: "equivalencia", label: "Equivalencia", re: /(equivalen|reemplaz|codigo|numero de (filtro|parte)|homolog|es igual al|mismo que)/ },
     { key: "ficha", label: "Ficha técnica", re: /(ficha|dexos|\bgen ?[123]\b|\bapi\b|\bacea\b|homolog|especificaci|contiene|composici|valvula|antirretorno|\bes sae\b|que viscosidad es|norma (vw|psa|mb|bmw)|\bpea\b|\bilsac\b|sintetico o semi)/ },
     { key: "postventa", label: "Post-venta", re: /(ya compr|realice (la )?compra|hice (la|una) compra|mi (pedido|compra|paquete|envio)|preparando tu envio|seguimiento|no me (llego|entregaron)|cuando (lo )?despach|ya pague|compre hace)/ },
     { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
+    { key: "reclamo", label: "Llegó mal", re: /(golpead|abollad|\broto\b|\brota\b|rompi|danad|vino mal|llego mal|perdia|pierde|derram|vino abierto|llego abierto|equivocad|no es (el|lo) que (pedi|compre)|falta(ba)? (un|una|el|la)|incompleto)/ },
+    { key: "retiro", label: "Retiro", re: /(retir(o|ar|arlo|amos)\b|en persona|tienen local|\blocal\b|direccion|donde (estan|quedan|se encuentran)|ubicad|sucursal)/ },
+    { key: "moto", label: "Moto", re: /\b(moto|motos|motocicleta|4t|cuatri|cuatriciclo|scooter)\b/ },
+    { key: "foto", label: "Foto", re: /(\bfoto\b|imagen|el de la (foto|imagen|publicacion))/ },
+    { key: "consejo", label: "Consulta técnica", re: /(diferencia|motor (viejo|usado|antiguo)|muchos? (km|kilometros)|cada cuant|cuantos (km|kilometros)|mezcl|que significa|que quiere decir|se puede usar|conviene (el )?(sintetico|semi|mineral))/ },
     { key: "marcas", label: "Marcas", re: /\bmarcas?\b|que (aceites|filtros|refrigerantes) (tienen|tenes|trabajan|manejan|venden)|(trabajan|manejan|venden) (con )?(que|cuales) /, },
     { key: "aceite", label: "Aceite", re: /(?<!filtros? (de |del |para )?)\baceites?\b|\b\d{1,2}w\d{2}\b|\blubricante/ },
     { key: "filtros", label: "Filtros", re: /filtro/ },
@@ -571,7 +578,7 @@ const Engine = (() => {
     ["indicanos", "indícanos"], ["pasanos", "pásanos"], ["consultanos", "consúltanos"], ["avisanos", "avísanos"], ["cargá", "carga"], ["fijate", "fíjate"],
     ["elegí", "elige"], ["vas a necesitar", "necesitarás"], ["contás", "cuentas"], ["escribinos", "escríbenos"], ["sumá", "suma"]];
   // Trato de usted, como responde la tienda ("su vehículo", "me podría indicar")
-  const USTED = [["vas a necesitar", "va a necesitar"], ["agregues", "agregue"], ["efectúes", "efectúe"], ["nos confirmás", "nos confirma"], ["nos decís", "nos dice"], ["nos pasás", "nos pasa"], ["nos indicás", "nos indica"],
+  const USTED = [["vas a necesitar", "va a necesitar"], ["lo ves", "lo ve"], ["iniciá", "inicie"], ["hacé", "haga"], ["usá", "use"], ["tenés que", "tiene que"], ["podés sumar", "puede sumar"], ["agregues", "agregue"], ["efectúes", "efectúe"], ["nos confirmás", "nos confirma"], ["nos decís", "nos dice"], ["nos pasás", "nos pasa"], ["nos indicás", "nos indica"],
     ["disculpá", "disculpe"], ["podés", "puede"], ["tenés", "tiene"], ["indicás", "indica"], ["querés", "quiere"], ["pasás", "pasa"], ["necesitás", "necesita"], ["contás", "cuenta"],
     ["confirmás", "confirma"], ["decís", "dice"], ["indicanos", "indíquenos"], ["pasanos", "pásenos"], ["consultanos", "consúltenos"], ["avisanos", "avísenos"],
     ["escribinos", "escríbanos"], ["cargá", "cargue"], ["fijate", "fíjese"], ["elegí", "elija"], ["sumá", "sume"], ["podrías", "podría"],
@@ -621,11 +628,12 @@ const Engine = (() => {
 "Chevrolet|Aveo|1.6|2008-2014|nafta|5W-30|10W-40||API SL",
 "Chevrolet|Astra/Vectra/Zafira|2.0|2000-2012|nafta|10W-40|15W-40||API SL",
 "Ford|Ka/Ka+|1.5|2016-2021|nafta|5W-20|5W-30||Ford WSS-M2C945",
+"Ford|Ka/Fiesta|1.0/1.6 Rocam|2008-2015|nafta|5W-30|10W-40|3,9|Ford WSS-M2C913",
 "Ford|Fiesta/Fiesta Kinetic/EcoSport/Focus|1.6 Sigma|2010-2019|nafta|5W-20|5W-30||Ford WSS-M2C945",
 "Ford|Focus/EcoSport/Kuga|2.0|2008-2019|nafta|5W-30|5W-20||Ford WSS-M2C913",
 "Ford|Ranger|2.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
 "Ford|Ranger|3.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
-"Fiat|Palio/Siena/Grand Siena/Uno/Strada/Idea/Fiorino/Punto|1.4 Fire|2006-2020|nafta|15W-40|10W-40||API SL",
+"Fiat|Palio/Siena/Grand Siena/Uno/Strada/Idea/Fiorino/Punto|1.4 Fire|2006-2020|nafta|15W-40|10W-40|3|API SL",
 "Fiat|Cronos/Argo/Mobi/Strada/Pulse|1.3 Firefly|2018-2025|nafta|0W-20|||API SN Plus",
 "Fiat|Mobi/Uno/Argo|1.0 Firefly|2017-2025|nafta|0W-20|||API SN Plus",
 "Renault|Sandero/Logan/Kangoo/Clio/Symbol|1.6 8v K7M|2007-2020|nafta|10W-40|15W-40||RN0700",
@@ -726,7 +734,15 @@ const Engine = (() => {
 "Toyota|RAV4|2.0/2.4|2006-2018|nafta|5W-30|0W-20|4,2|API SN",
 "Toyota|Innova|2.7|2016-2025|nafta|5W-30|0W-20|4,4|API SN",
 "Toyota|Prado|3.0 D-4D|2003-2016|diesel|15W-40|5W-30|7|API CF-4",
-"Bajaj|Boxer|150cc|2010-2025|nafta|20W-50|10W-40|1,1|JASO MA"
+"Bajaj|Boxer|150cc|2010-2025|nafta|20W-50|10W-40|1,1|JASO MA",
+"Bajaj|Rouser/Pulsar/Dominar/Avenger|135-400cc|2010-2025|nafta|10W-40|20W-50|1,5|JASO MA",
+"Honda|Wave/Biz/CG/Titan/GLH/XR/Tornado/XRE/CB190/CB125/CB250/Twister/Falcon|110-300cc|2000-2025|nafta|10W-30|10W-40|1|JASO MA",
+"Yamaha|YBR/FZ/Fazer/XTZ/Crypton/Ténéré|110-250cc|2000-2025|nafta|20W-50|10W-40|1,2|JASO MA",
+"Motomel|Blitz/Skua/Dakar/CG150/Sirius/Custom|110-250cc|2005-2025|nafta|20W-50|10W-40|1|JASO MA",
+"Corven|Energy/Triax/Hunter/Mirage/Indiana|110-250cc|2005-2025|nafta|20W-50|10W-40|1|JASO MA",
+"Gilera|Smash/Sahel/AC4/VC150|110-250cc|2005-2025|nafta|20W-50|10W-40|1|JASO MA",
+"Zanella|ZB/RX150/Patagonian/Sapucai/Styler/Due|110-250cc|2005-2025|nafta|20W-50|10W-40|1|JASO MA",
+"Suzuki|GN125/EN125/AX100/Gixxer|100-150cc|2000-2025|nafta|20W-50|10W-40|1|JASO MA"
 ];
   const brandKeyOf = (marca) => { const n = norm(marca); return Object.keys(BRANDS).find((k) => k === n || BRANDS[k].includes(n)) || null; };
   const VEHICLES = VEH_DATA.map((l) => {
@@ -752,12 +768,14 @@ const Engine = (() => {
     cands.forEach((x) => (best = Math.max(best, x.spec)));
     cands = cands.filter((x) => x.spec === best).map((x) => x.v);
     const narrow = (f) => { const r = cands.filter(f); if (r.length) cands = r; };
-    if (veh.engine) narrow((v) => v.motor.startsWith(veh.engine));
+    // Motor o año que no corresponde a ninguna versión de la guía: mejor no adivinar (ej. Ka 1.0 2012 no es el Ka 1.5)
+    const motorHas = (v) => v.motor.startsWith(veh.engine) || v.motor.split(/[\/\s]/).includes(veh.engine);
+    if (veh.engine) { if (cands.some(motorHas)) narrow(motorHas); else if (cands.length && cands.every((v) => /\d[.,]\d/.test(v.motor))) return { exact: null, options: [] }; }
     const kw = (v) => tokens(v.motor).filter((t) => !/^\d/.test(t) || /^\d+v$/.test(t));
     if (cands.some((v) => kw(v).some((t) => qset.has(t)))) narrow((v) => kw(v).some((t) => qset.has(t)));
     if (/\b(diesel|tdi|hdi|dci|tdci|td|d4d|gasoil)\b/.test(n)) narrow((v) => v.comb === "diesel");
     else if (/\bnaft/.test(n)) narrow((v) => v.comb === "nafta");
-    if (veh.year) { const y = Number(veh.year); narrow((v) => y >= v.y1 && y <= v.y2); }
+    if (veh.year) { const y = Number(veh.year); const inY = (v) => y >= v.y1 && y <= v.y2; if (cands.some(inY)) narrow(inY); else if (cands.length) return { exact: null, options: [] }; }
     if (cands.length === 1) return { exact: cands[0], options: cands };
     if (cands.length > 1 && new Set(cands.map((v) => v.visc)).size === 1) {
       const lit = [...new Set(cands.map((v) => v.litros))];
@@ -818,7 +836,7 @@ const Engine = (() => {
     if (!veh) return false;
     if (veh.engine || /\d+cc/.test(veh.label)) return true;
     const vs = VEHICLES.filter((v) => v.brand === veh.brand && v.modelos.some((m) => norm(m) === veh.model));
-    return vs.length > 0 && vs.every((v) => !/\d[.,]\d|\dcc/.test(v.motor));
+    return vs.length > 0 && (vs.every((v) => !/\d[.,]\d|\dcc/.test(v.motor)) || new Set(vs.map((v) => v.motor)).size === 1);
   }
   function engineVariants(veh) {
     if (!veh || !veh.model) return 0;
@@ -883,7 +901,7 @@ const Engine = (() => {
       - (!heavy && /\b\d+\s*(bidones|unidades|u)\b|caja|balde|pack|paq|\bx\s*20\s*l/.test(it._n) ? 2 : 0); };
     const out = [];
     vs.forEach((v) => {
-      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, v) && !/filtro|\bkit\b|caja (manual|autom)|diferencial|transmision|atf|cvt/.test(it._n) && (moto ? /\b(2t|4t|moto)\b/.test(it._n) : !/\b(2t|4t|moto)\b/.test(it._n)); });
+      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, v) && !/filtro|\bkit\b|caja (manual|autom)|diferencial|transmision|atf|cvt|nautic|outboard|marine/.test(it._n) && (moto ? /\b(2t|4t|moto)\b/.test(it._n) : !/\b(2t|4t|moto)\b/.test(it._n)); });
       oils.sort((a, b) => sc(b) - sc(a)).forEach((it) => { if (out.length < n && !out.includes(it)) out.push(it); });
     });
     return out;
@@ -943,10 +961,11 @@ const Engine = (() => {
     const wantsFilters = intents.has("filtros") || intents.has("kit") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
     const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo") || (intents.has("aceite") && !!(veh && veh.model));
     const ambiguous = !guide && veh && veh.model && options.length > 1;
-    const oilTalk = !isFilter || intents.has("litros") || intents.has("aceite") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
+    const oilTalk = !isFilter || intents.has("litros") || intents.has("aceite") || intents.has("combo") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
 
     out.push("Buenas,");
     const finish = () => {
+      if (out.filter(Boolean).length < 2) out.push("¿Nos podrías dar un poco más de detalle de tu consulta así te respondemos bien?");
       if (S.despedida) out.push(S.despedida);
       const [hello, ...rest] = out.filter(Boolean);
       let body = rest.join(" ").replace(/\s+/g, " ").trim();
@@ -980,8 +999,43 @@ const Engine = (() => {
       return finish();
     }
     if (intents.has("postventa") && S.postventa) { out.push(S.postventa); return finish(); }
+    const nq0 = norm(q);
+    // Llegó golpeado, roto o equivocado: se pide el reclamo por Mercado Libre
+    if (intents.has("reclamo") && S.reclamo) { out.push(S.reclamo); return finish(); }
+    if (intents.has("retiro") && S.retiro) out.push(S.retiro);
+    // "¿Es el de la foto?"
+    if (intents.has("foto") && !intents.has("compat")) { out.push("Sí, el producto que enviamos es el de la publicación."); if (intents.size === 1) return finish(); }
+    // "¿El kit trae el aceite?"
+    if (/\b(trae|incluye|viene con)\b/.test(nq0) && /aceite/.test(nq0) && (/\b(kit|juego|combo)\b/.test(nq0) || (prod && /\b(kit|juego)\b/i.test(prod.t)))) {
+      if (prod && /\b(kit|juego)\b/i.test(prod.t)) {
+        const withOil = /\+\s*\d+\s*l|\d{1,2}w\d{2}|aceite \+/i.test(prod.t);
+        out.push(withOil ? "Sí, el " + P + " incluye el aceite además de los filtros." : "No, el kit trae solo los filtros. El aceite lo podés sumar al carrito por separado.");
+      } else out.push("Depende del kit: los que dicen «+ 4L» en el título incluyen el aceite, los demás traen solo los filtros.");
+      if (!(veh && veh.model)) return finish();
+    }
+    // Consultas técnicas comunes sobre aceite
+    if (intents.has("consejo")) {
+      const tips = [
+        [/(semi ?sintetico|sintetico|mineral).*(semi ?sintetico|sintetico|mineral)|diferencia.*(semi|sintetic|mineral)/, "El sintético usa bases de mayor calidad: protege mejor en el arranque, soporta más temperatura y dura más entre cambios. El semisintético es una mezcla con base mineral, más económico, y anda muy bien en uso normal o en motores con más kilómetros. Lo importante es respetar la viscosidad y la norma que indica el manual."],
+        [/\d{1,2}w\d{2}.*\d{1,2}w\d{2}|que (significa|quiere decir)/, "El primer número (antes de la W) indica qué tan fluido es el aceite en frío: más bajo protege mejor en el arranque. El segundo indica el espesor a temperatura de trabajo. Por ejemplo, un 5W-30 es más fluido y es el de los motores modernos; un 10W-40 o 15W-40 es más espeso y es habitual en motores con más años. Lo correcto es usar el que indica el manual del vehículo."],
+        [/sintetico.*(viejo|usado|antiguo|km|kilometr)|(viejo|usado|antiguo|km|kilometr).*sintetico|motor (viejo|usado|antiguo)/, "Sí, se puede usar sintético en un motor con muchos kilómetros, siempre respetando la viscosidad que indica el manual. Si el motor ya consume aceite, un semisintético o una viscosidad un poco más alta (por ejemplo 15W-40 o 20W-50) suele andar mejor."],
+        [/cada cuant|cuantos (km|kilometros)/, "En general el aceite se cambia cada 10.000 km con sintético y cada 5.000 a 7.500 km con semisintético o mineral, o una vez al año, lo que ocurra primero. Siempre conviene seguir lo que indica el manual y cambiar el filtro de aceite en cada service."],
+        [/mezcl/, "No es recomendable mezclar aceites. Si tenés que completar nivel, usá uno de la misma viscosidad y norma, y en el próximo service hacé el cambio completo."],
+        [/.*/, "Lo más importante es usar la viscosidad y la norma que indica el manual del vehículo."],
+      ];
+      out.push(tips.find(([re]) => re.test(nq0))[1]);
+      if (!(veh && veh.model)) { out.push("Si nos pasás marca, modelo, año y motor, te decimos cuál le corresponde y te pasamos el link."); return finish(); }
+    }
+    // Aceite para moto
+    if (intents.has("moto") && !(veh && veh.model)) {
+      const isMoto = prod && /\b(4t|2t|moto)\b/i.test(prod.t);
+      if (prod && !isFilter && pv) {
+        if (isMoto) out.push("Sí, el " + P + " es un aceite para moto 4T.");
+        else { const mo = (brands && brands.motoOil) || null; out.push("No, el " + P + " es para autos y camionetas. Para moto conviene un aceite 4T con norma JASO MA" + (mo ? ", como el " + prodName(mo.t) + "." + lk(mo) : ".")); return finish(); }
+      } else { out.push("Sí, tenemos aceites para moto 4T. ¿Nos indicás qué moto tenés (modelo y cilindrada) así te recomendamos el indicado?"); return finish(); }
+    }
     // "¿Qué marcas de aceite tienen?": las marcas de la tienda y, si hay vehículo, sigue con el indicado
-    if (intents.has("marcas") && brands) {
+    if (intents.has("marcas") && brands && (/\bmarcas?\b/.test(nq0) || !(veh && veh.model))) {
       const nq = norm(q);
       const kind = /filtro/.test(nq) ? "filtro" : /refrigerante|anticongelante|coolant|paraflu/.test(nq) ? "refrigerante" : "aceite";
       const list = brands[kind] || [];
@@ -993,18 +1047,20 @@ const Engine = (() => {
     }
     // Si el cliente pide algo para su vehículo y falta el año o el motor, primero se pregunta (sin pasar links)
     if (veh && veh.model && !fram.length && !ambiguous && (wantsFilters || vehTalk)) {
-      const falta = [!veh.year && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
+      const falta = [!veh.year && !veh.moto && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
       if (falta) { out.push("¿Me podrías indicar el " + falta + " de tu " + veh.label + "?"); return finish(); }
     }
 
     if (vehTalk && guide && veh) {
       const parts = [];
       if (gv && oilTalk) parts.push("se recomienda aceite " + fmtVisc(gv) + (guide.alt ? " (también " + guide.alt + ")" : "") + (guide.norma ? ", que cumpla la norma " + guide.norma : ""));
-      if (guide.litros && oilTalk) parts.push("lleva aproximadamente " + guide.litros + " litros con cambio de filtro");
+      if (guide.litros && oilTalk) parts.push("lleva aproximadamente " + guide.litros + (String(guide.litros) === "1" ? " litro" : " litros") + " con cambio de filtro");
       if (isFilter && guide.fa) parts.push("el filtro de aceite que corresponde es " + guide.fa);
       if (parts.length) out.push("Para tu " + veh.label + " " + parts.join(" y ") + ".");
       if (prod && pv && gv) {
-        if (pv === gv) out.push(pick("ok", ["El " + P + " cumple con esa viscosidad, así que es el indicado.", "El " + P + " es " + fmtVisc(pv) + ", así que te va perfecto."]));
+        const av = guide.alt ? viscOf(guide.alt)[0] : null;
+        if (pv !== gv && pv === av) out.push("El " + P + " es " + fmtVisc(pv) + ", que también está indicado para tu vehículo, así que te sirve.");
+        else if (pv === gv) out.push(pick("ok", ["El " + P + " cumple con esa viscosidad, así que es el indicado.", "El " + P + " es " + fmtVisc(pv) + ", así que te va perfecto."]));
         else out.push("El " + P + " es " + fmtVisc(pv) + ", por eso te recomendamos un " + fmtVisc(gv) + (alt ? ": el " + prodName(alt.t) + " es ideal." : "."));
       } else if ((!prod || isFilter) && oilTalk && combo.oil) {
         out.push(pick("oilrec", ["De nuestra tienda te recomendamos el " + prodName(combo.oil.t) + ".", "El ideal de nuestra tienda es el " + prodName(combo.oil.t) + "."]) + lk(combo.oil));
@@ -1108,12 +1164,14 @@ const Engine = (() => {
       if (!asked) out.push("Si nos pasás el código de tu filtro actual, o marca, modelo, año y motor del vehículo, te confirmamos el equivalente.");
     }
 
-    if (intents.has("precio")) {
+    const envioCosto = /(envio|flete).{0,12}gratis|gratis.{0,12}envio|cuanto (sale|cuesta|vale|cobran|es) (el )?(envio|flete)|costo (del? )?(envio|flete)/.test(norm(q));
+    if (envioCosto) out.push("El costo del envío lo calcula Mercado Libre según tu código postal: lo ves en la publicación antes de comprar, y en muchos productos el envío es gratis.");
+    if (intents.has("precio") && !envioCosto) {
       out.push("El precio es el que figura en la publicación.");
       if (/(mayor|varias|\d+ unidades|si llevo|cantidad)/.test(norm(q))) out.push("Si necesitás varias unidades, podés elegir la cantidad al momento de comprar.");
     }
     if (intents.has("pago") && S.pago) out.push(S.pago);
-    if (intents.has("envio") && S.envio) out.push(S.envio);
+    if (intents.has("envio") && S.envio && !envioCosto) out.push(S.envio);
     if (intents.has("factura") && S.factura) out.push(S.factura);
     if (intents.has("original") && S.original) out.push(S.original);
     if (intents.has("devolucion") && S.devolucion) out.push(S.devolucion);
@@ -1221,6 +1279,8 @@ const Engine = (() => {
     pago: "Podés pagar con todos los medios que ofrece Mercado Pago, incluso en cuotas.",
     original: "Todos nuestros productos son originales, nuevos y sellados, con fecha de vencimiento vigente.",
     devolucion: "Si tenés algún inconveniente, podés gestionar el cambio o la devolución desde Mercado Libre.",
+    retiro: "Por el momento no tenemos retiro en persona: todas las ventas se envían por Mercado Envíos a todo el país.",
+    reclamo: "Lamentamos el inconveniente. Por favor, iniciá el reclamo desde Mis compras en Mercado Libre con una foto del producto y lo resolvemos a la brevedad.",
   };
   let catalog = store.get("catalog", null);
   if (!Array.isArray(catalog)) { catalog = CATALOGO_INICIAL.slice(); store.set("catalog", catalog); store.set("catVersion", CATALOGO_VERSION); }
@@ -1307,8 +1367,8 @@ const Engine = (() => {
       const nqf = E.norm(q);
       const wantCat = /filtros? (de |del )?aceite/.test(nqf) ? "aceite" : /filtros? (de |del )?aire(?! acond)/.test(nqf) ? "aire"
         : /filtros? (de |del )?(combustible|nafta|gasoil)/.test(nqf) ? "combustible" : /filtros? (de |del )?(habitaculo|polen|cabina)/.test(nqf) ? "habitáculo" : null;
-      const onlyOil = /\baceites?\b/.test(nqf) && !/filtro|\bkit\b|combo|service/.test(nqf);
-      const fits = (it) => onlyOil ? !/filtro|\bkit\b/i.test(it.t) : !/filtro/i.test(it.t) || (E.filterFits(it, v2) && (!wantCat || /kit/i.test(it.t) || E.filterCat(E.norm(it.t)) === wantCat));
+      const onlyOil = (/\baceites?\b|\d{1,2}w\d{2}/.test(nqf) || !/filtro|\bkit\b|juego|combo|service/.test(nqf)) && !/filtro|\bkit\b|juego|combo|service/.test(nqf);
+      const fits = (it) => onlyOil ? !/filtro|\bkit\b|juego/i.test(it.t) : !/filtro/i.test(it.t) || (E.filterFits(it, v2) && (!wantCat || /kit/i.test(it.t) || E.filterCat(E.norm(it.t)) === wantCat));
       // Si el cliente nombra una marca, primero los productos de esa marca
       const nqb = E.norm(q);
       const br = OIL_BRANDS.find(([k]) => new RegExp("\\b" + k + "\\b").test(nqb));
@@ -1397,7 +1457,8 @@ const Engine = (() => {
     const gv = g && g.visc ? E.viscOf(g.visc)[0] : null;
     const pv = prod && !/filtro/i.test(prod.t) ? E.viscOf(prod.t)[0] : null;
     let alt = null;
-    if (gv && pv && pv !== gv) { alt = combo.oil; if (alt && E.keyOf(alt) === E.keyOf(prod)) alt = null; }
+    const av = g && g.alt ? E.viscOf(g.alt)[0] : null;
+    if (gv && pv && pv !== gv && pv !== av) { alt = combo.oil; if (alt && E.keyOf(alt) === E.keyOf(prod)) alt = null; }
 
     // Lo que detecté
     const f = $("facts"); f.textContent = "";
@@ -1479,7 +1540,8 @@ const Engine = (() => {
     // Mismo producto en otro tamaño
     const variant = !noBrand && prod ? findVariant(prod, q) : null;
     const ficha = prod ? fichas[E.keyOf(prod)] || null : null;
-    $("answer").value = E.compose({ brands: { aceite: E.brandsOf(catalog, "aceite"), filtro: E.brandsOf(catalog, "filtro"), refrigerante: E.brandsOf(catalog, "refrigerante") }, intents, prod: noBrand ? null : prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q,
+    const motoOil = catalog.find((it) => /\b4t\b|moto/i.test(it.t) && /10w-?40|20w-?50/i.test(it.t) && /\b1\s*(l|lt|litro)\b/i.test(it.t) && !/bidones|unidades|caja|paq|pack|\(/i.test(it.t)) || null;
+    $("answer").value = E.compose({ brands: { aceite: E.brandsOf(catalog, "aceite"), filtro: E.brandsOf(catalog, "filtro"), refrigerante: E.brandsOf(catalog, "refrigerante"), motoOil }, intents, prod: noBrand ? null : prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q,
       verdict: state.verdict, noBrand, variant, ficha });
     // Si la respuesta le pide datos al cliente, se resalta el botón para guardar la pregunta
     $("saveQ").classList.toggle("hot", /¿/.test($("answer").value) && !!$("q").value.trim());
@@ -1886,7 +1948,7 @@ const Engine = (() => {
   });
 
   // ---- Ajustes
-  const SET_FIELDS = { sTrato: "trato", sLink: "link", sDespedida: "despedida", sEnvio: "envio", sFactura: "factura", sPago: "pago", sOriginal: "original", sDevolucion: "devolucion", sPostventa: "postventa" };
+  const SET_FIELDS = { sTrato: "trato", sLink: "link", sDespedida: "despedida", sEnvio: "envio", sFactura: "factura", sPago: "pago", sOriginal: "original", sDevolucion: "devolucion", sPostventa: "postventa", sRetiro: "retiro", sReclamo: "reclamo" };
   function loadSettingsForm() { Object.entries(SET_FIELDS).forEach(([id, k]) => ($(id).value = settings[k] ?? "")); }
   Object.entries(SET_FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { settings[k] = $(id).value; store.set("settings", settings); update(); }));
   $("resetSettings").addEventListener("click", () => { settings = { ...DEFAULTS, trato: settings.trato, link: settings.link }; store.set("settings", settings); loadSettingsForm(); update(); toast("Textos restablecidos."); });
