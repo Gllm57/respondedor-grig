@@ -279,50 +279,95 @@ const Engine = (() => {
   }
 
   // ---- Vehículos
-  const BRANDS = { volkswagen: ["vw", "volkswagen", "volks"], chevrolet: ["chevrolet", "chevy", "chevrolet"], ford: ["ford"], fiat: ["fiat"],
-    renault: ["renault"], peugeot: ["peugeot"], citroen: ["citroen"], toyota: ["toyota"], honda: ["honda"], nissan: ["nissan"],
-    hyundai: ["hyundai"], kia: ["kia"], jeep: ["jeep"], ram: ["ram"], "mercedes-benz": ["mercedes", "benz"], bmw: ["bmw"], audi: ["audi"],
-    suzuki: ["suzuki"], mitsubishi: ["mitsubishi"], chery: ["chery"], dodge: ["dodge"], iveco: ["iveco"] };
+  // ---- Marcas y modelos que se reconocen en la pregunta (autos, utilitarios, camiones y motos del mercado argentino)
+  const BRANDS = { volkswagen: ["vw", "volkswagen", "volks", "wolkswagen", "volkswaguen", "volkwagen"], chevrolet: ["chevrolet", "chevrolett", "chevrolete", "chevy"],
+    ford: ["ford"], fiat: ["fiat"], renault: ["renault", "renol", "reno"], peugeot: ["peugeot", "peugot", "pegeot", "peugeut"], citroen: ["citroen", "citroen"],
+    toyota: ["toyota"], honda: ["honda"], nissan: ["nissan", "nisan"], hyundai: ["hyundai", "hiunday", "hyunday"], kia: ["kia"], jeep: ["jeep"], ram: ["ram"],
+    "mercedes-benz": ["mercedes", "benz", "mb"], bmw: ["bmw"], audi: ["audi"], suzuki: ["suzuki"], mitsubishi: ["mitsubishi", "mitsubichi"], chery: ["chery"],
+    dodge: ["dodge"], iveco: ["iveco"], subaru: ["subaru"], volvo: ["volvo"], mini: ["mini"], alfa: ["alfa"], ds: ["ds"], geely: ["geely"], byd: ["byd"],
+    jac: ["jac"], haval: ["haval"], greatwall: ["greatwall"], dfsk: ["dfsk"], baic: ["baic"], lifan: ["lifan"], scania: ["scania"], agrale: ["agrale"],
+    yamaha: ["yamaha"], motomel: ["motomel"], corven: ["corven"], gilera: ["gilera"], zanella: ["zanella"], bajaj: ["bajaj"], ktm: ["ktm"],
+    kawasaki: ["kawasaki"], benelli: ["benelli"], keller: ["keller"], harley: ["harley"], royal: ["royal"], beta: ["beta"], mondial: ["mondial"] };
   const BRAND_NAME = { volkswagen: "Volkswagen", chevrolet: "Chevrolet", ford: "Ford", fiat: "Fiat", renault: "Renault", peugeot: "Peugeot",
     citroen: "Citroën", toyota: "Toyota", honda: "Honda", nissan: "Nissan", hyundai: "Hyundai", kia: "Kia", jeep: "Jeep", ram: "RAM",
-    "mercedes-benz": "Mercedes-Benz", bmw: "BMW", audi: "Audi", suzuki: "Suzuki", mitsubishi: "Mitsubishi", chery: "Chery", dodge: "Dodge", iveco: "Iveco" };
-  const M = (brand, list, needBrand) => list.split(" ").map((m) => [m, { brand, needBrand: !!needBrand }]);
-  const MODELS = Object.fromEntries([
-    ...M("volkswagen", "gol trend voyage suran fox crossfox up polo virtus vento golf bora jetta senda amarok saveiro taos tiguan nivus tcross passat scirocco"),
-    ...M("chevrolet", "corsa classic onix prisma cruze tracker s10 trailblazer c10 c20 d20 spin agile celta astra vectra zafira meriva cobalt aveo captiva montana equinox"),
-    ...M("ford", "ka fiesta focus ecosport ranger territory mondeo maverick kuga escort transit"),
-    ...M("fiat", "palio siena uno punto cronos argo mobi toro strada fiorino idea duna pulse ducato"),
-    ...M("renault", "clio sandero logan kangoo duster stepway megane fluence kwid captur symbol oroch alaskan koleos twingo master"),
-    ...M("peugeot", "206 207 208 307 308 408 306 405 301 504 partner expert boxer"), ...M("peugeot", "2008 3008 5008", true),
-    ...M("citroen", "c3 c4 berlingo xsara picasso c5 aircross ds3 cactus lounge"),
-    ...M("toyota", "hilux corolla etios yaris sw4 rav4 camry"),
-    ...M("honda", "civic fit city hrv crv wrv"),
-    ...M("nissan", "frontier march versa sentra kicks tiida note"),
-    ...M("hyundai", "tucson i10 i30 creta hb20"), ...M("jeep", "renegade compass"),
-  ]);
+    "mercedes-benz": "Mercedes-Benz", bmw: "BMW", audi: "Audi", suzuki: "Suzuki", mitsubishi: "Mitsubishi", chery: "Chery", dodge: "Dodge", iveco: "Iveco",
+    subaru: "Subaru", volvo: "Volvo", mini: "Mini", alfa: "Alfa Romeo", ds: "DS", geely: "Geely", byd: "BYD", jac: "JAC", haval: "Haval", greatwall: "Great Wall",
+    dfsk: "DFSK", baic: "BAIC", lifan: "Lifan", scania: "Scania", agrale: "Agrale", yamaha: "Yamaha", motomel: "Motomel", corven: "Corven", gilera: "Gilera",
+    zanella: "Zanella", bajaj: "Bajaj", ktm: "KTM", kawasaki: "Kawasaki", benelli: "Benelli", keller: "Keller", harley: "Harley-Davidson", royal: "Royal Enfield",
+    beta: "Beta", mondial: "Mondial" };
+  const MOTO_BRANDS = new Set(["yamaha", "motomel", "corven", "gilera", "zanella", "bajaj", "ktm", "kawasaki", "benelli", "keller", "harley", "royal", "beta", "mondial"]);
+  // M(marca, "modelos", necesitaMarca, esMoto): necesitaMarca = el modelo solo cuenta si también se nombra la marca (números o palabras comunes)
+  const M = (brand, list, needBrand, moto) => list.split(" ").map((m) => [m, { brand, needBrand: !!needBrand, moto: !!moto }]);
+  const MODEL_LIST = [
+    ...M("volkswagen", "gol trend voyage suran fox crossfox polo virtus vento golf bora jetta senda amarok saveiro taos tiguan nivus tcross passat scirocco gacel carat quantum santana sharan touareg transporter caddy beetle escarabajo vocho"),
+    ...M("volkswagen", "up 1500 delivery constellation worker", true),
+    ...M("chevrolet", "corsa classic onix prisma cruze tracker s10 trailblazer c10 c20 d20 spin agile celta astra vectra zafira meriva cobalt aveo captiva montana equinox sonic blazer silverado monza kadett corvette camaro omega"),
+    ...M("chevrolet", "joy 400", true),
+    ...M("ford", "ka fiesta focus ecosport ranger territory mondeo maverick kuga escort transit falcon sierra f100 f150 f250 f4000 bronco orion galaxy courier explorer everest mustang cargo"),
+    ...M("fiat", "palio siena uno punto cronos argo mobi toro strada fiorino idea duna pulse ducato doblo linea stilo bravo qubo fastback titano regatta tipo tempra spazio weekend adventure"),
+    ...M("fiat", "500 128 147 600 125 1500", true),
+    ...M("renault", "clio sandero logan kangoo duster stepway megane fluence kwid captur symbol oroch alaskan koleos twingo master scenic laguna trafic kardian arkana express"),
+    ...M("renault", "9 11 12 18 19 21 4", true),
+    ...M("peugeot", "106 205 206 207 208 306 307 308 405 406 407 408 301 504 505 607 partner expert boxer rifter traveller"), ...M("peugeot", "2008 3008 5008 404", true),
+    ...M("citroen", "c3 c4 c5 berlingo xsara picasso ds3 ds4 cactus lounge aircross saxo elysee jumpy jumper zx c15 c4l"),
+    ...M("toyota", "hilux corolla etios yaris sw4 rav4 camry prius hiace prado cruiser fortuner innova corona tercel"),
+    ...M("honda", "civic fit city hrv crv wrv accord odyssey"),
+    ...M("honda", "wave titan cg xr tornado biz glh xre cbr cb190 cb250 cb125 cb1 twister falcon nc750 transalp africa pcx navi elite lead", false, true),
+    ...M("nissan", "frontier march versa sentra kicks tiida xtrail np300 pathfinder murano juke primera almera"), ...M("nissan", "note", true),
+    ...M("hyundai", "tucson i10 i20 i30 creta hb20 accent elantra santa h1 h100 veloster getz ioniq"),
+    ...M("kia", "picanto cerato sportage sorento soul carnival k2500 k2700 stonic seltos sephia"), ...M("kia", "rio", true),
+    ...M("jeep", "renegade compass cherokee wrangler commander gladiator"),
+    ...M("ram", "rampage 1500 2500 700", true),
+    ...M("mercedes-benz", "sprinter vito accelo atego actros axor"), ...M("mercedes-benz", "1114 1518 1620 710", true),
+    ...M("mitsubishi", "l200 lancer outlander montero asx eclipse pajero galant"),
+    ...M("suzuki", "swift vitara jimny alto celerio baleno fun samurai"), ...M("suzuki", "gn125 en125 ax100 gixxer", false, true),
+    ...M("chery", "qq tiggo arrizo fulwin face"), ...M("dodge", "journey durango dakota neon"),
+    ...M("audi", "a1 a3 a4 a5 a6 q2 q3 q5 q7 tt"), ...M("bmw", "x1 x3 x5 x6 320i 118i 120i 325i 328i 330i", true),
+    ...M("geely", "emgrand coolray"), ...M("byd", "dolphin song yuan seal"), ...M("jac", "j2 j3 s2 s3 refine t6 t8", true), ...M("haval", "h6 jolion"),
+    ...M("greatwall", "wingle poer hover", false), ...M("dfsk", "glory c31 c35 k01", true), ...M("lifan", "x60 320", true), ...M("iveco", "daily tector stralis eurocargo"),
+    ...M("subaru", "impreza forester outback xv legacy"), ...M("volvo", "xc40 xc60 xc90 s40 s60 v40 fh"), ...M("alfa", "romeo 147 156 159 mito giulietta", true),
+    ...M("yamaha", "ybr fz fazer xtz crypton tenere xmax nmax raptor yfm blaster", false, true), ...M("yamaha", "mt03 mt07 mt09 r3 r15 r1 ray", true, true),
+    ...M("motomel", "blitz skua dakar cg150 sirius custom", false, true), ...M("corven", "energy triax hunter mirage indiana", false, true),
+    ...M("gilera", "smash sahel ac4 vc150 ax100", false, true), ...M("zanella", "zb rx150 patagonian sapucai styler ceccato due", false, true),
+    ...M("bajaj", "rouser dominar boxer pulsar avenger platina", false, true), ...M("ktm", "duke adventure exc rc390 390 200", false, true),
+    ...M("kawasaki", "ninja versys vulcan klr kx", false, true), ...M("kawasaki", "z400 z900", true, true), ...M("benelli", "tnt leoncino trk imperiale", false, true),
+  ];
+  const MODELS = {};
+  MODEL_LIST.forEach(([m, v]) => { (MODELS[m] = MODELS[m] || []).push(v); });
+  // Modelos de dos palabras
+  const MULTI = new Set(["gol trend", "gol power", "gol country", "fox highline", "grand siena", "santa fe", "land cruiser", "grand cherokee", "grand vitara", "corolla cross", "onix plus", "c4 lounge", "c4 cactus",
+    "c3 aircross", "palio weekend", "fiat 500", "c4 picasso", "polo classic", "xsara picasso", "ds3 cabrio", "ranger raptor", "s10 trailblazer", "fiesta kinetic",
+    "fiesta max", "ka sedan", "clio mio", "sandero stepway", "logan mcv", "focus ii", "focus iii", "uno way", "strada adventure", "cruze rs", "hilux srv", "hilux srx"]);
+  const STOP_AFTER_BRAND = new Set(["de", "del", "modelo", "ano", "anio", "motor", "que", "para", "con", "es", "y", "o", "la", "el", "mi", "un", "una", "nafta", "diesel", "gnc"]);
   function extractVehicle(q) {
-    const n = norm(q);
+    const n = norm(q).replace(/\bgreat\s+wall\b/g, "greatwall").replace(/\bx[-\s]trail\b/g, "xtrail").replace(/\bl[-\s]200\b/g, "l200")
+      .replace(/\bc[-\s]elysee\b/g, "elysee").replace(/\bmt[-\s]0?(\d)\b/g, "mt0$1").replace(/\bcb\s?(190|250|125)\b/g, "cb$1").replace(/\bnp\s?300\b/g, "np300");
     const toks = n.split(/[^a-z0-9.]+/).filter(Boolean);
-    let brand = null;
-    for (const [b, al] of Object.entries(BRANDS)) if (toks.some((t) => al.includes(t))) { brand = b; break; }
-    let model = null;
-    for (const t of toks) {
-      const m = MODELS[t];
-      if (!m) continue;
-      if (m.needBrand && brand !== m.brand) continue;
-      if (brand && brand !== m.brand) continue;
-      model = t; brand = brand || m.brand; break;
+    let brand = null, bi = -1;
+    toks.forEach((t, i) => { if (brand) return; for (const [b, al] of Object.entries(BRANDS)) if (al.includes(t)) { brand = b; bi = i; break; } });
+    let model = null, mi = -1, moto = false;
+    const cands = [];
+    toks.forEach((t, i) => (MODELS[t] || []).forEach((m) => { if (!(m.needBrand && brand !== m.brand) && !(brand && brand !== m.brand)) cands.push({ t, i, m }); }));
+    // "2008" puede ser el año: si hay otro modelo en la pregunta, gana ese
+    const pickC = cands.find((c) => !/^(19|20)\d\d$/.test(c.t)) || cands[0];
+    if (pickC) { model = pickC.t; mi = pickC.i; brand = brand || pickC.m.brand; moto = pickC.m.moto; }
+    if (model && mi + 1 < toks.length && MULTI.has(model + " " + toks[mi + 1])) model += " " + toks[mi + 1];
+    // Marca conocida y modelo no listado: se toma la palabra que sigue a la marca (ej. "Chevrolet Kadett")
+    if (brand && !model && bi >= 0) {
+      const nx = toks[bi + 1];
+      if (nx && !STOP_AFTER_BRAND.has(nx) && !/^(19|20)\d\d$/.test(nx) && !/^\d[.,]\d$/.test(nx) && nx.length >= 2) model = nx;
     }
-    if (model === "gol" && toks.includes("trend")) model = "gol trend";
-    const yr = n.match(/\b(19[89]\d|20[0-3]\d)\b/);
-    const year = yr && !(model === yr[1]) ? yr[1] : null;
+    if (MOTO_BRANDS.has(brand)) moto = true;
+    const year = (n.match(/\b(19[5-9]\d|20[0-3]\d)\b/g) || []).find((y) => !(model && model.split(" ").includes(y))) || null;
     const eng = n.match(/\b([0-6][.,]\d)\b/);
-    const fuel = (n.match(/\b(tdi|hdi|jtd|dci|tsi|diesel|nafta|gnc|turbo)\b/) || [])[1] || null;
+    let cc = !eng && moto ? (n.match(/\b(\d{2,4})\s?cc\b/) || [])[1] : null;
+    if (moto && !cc && mi >= 0 && /^\d{2,4}$/.test(toks[mi + (model.includes(" ") ? 2 : 1)] || "")) { const c = Number(toks[mi + (model.includes(" ") ? 2 : 1)]); if (c >= 50 && c <= 1300) cc = String(c); }
+    const fuel = (n.match(/\b(tdi|hdi|jtd|dci|tsi|tdci|thp|diesel|nafta|gnc|turbo)\b/) || [])[1] || null;
     if (!brand && !model) return null;
     const cap = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
-    const label = [BRAND_NAME[brand] || "", model ? (/^[a-z ]+$/.test(model) ? cap(model) : model.toUpperCase()) : "", eng ? eng[1].replace(",", ".") : "", fuel ? (fuel.length <= 3 ? fuel.toUpperCase() : fuel) : "", year || ""]
-      .filter(Boolean).join(" ");
-    return { brand, model, year, engine: eng ? eng[1].replace(",", ".") : null, label };
+    const label = [BRAND_NAME[brand] || "", model ? (/^[a-z ]+$/.test(model) ? cap(model) : model.toUpperCase()) : "", eng ? eng[1].replace(",", ".") : (cc ? cc + "cc" : ""),
+      fuel ? (fuel.length <= 4 ? fuel.toUpperCase() : fuel) : "", year || ""].filter(Boolean).join(" ");
+    return { brand, model, year, engine: eng ? eng[1].replace(",", ".") : null, moto, label };
   }
   function findGuide(guide, q, veh) {
     if (!veh || !guide.length) return null;
@@ -662,7 +707,7 @@ const Engine = (() => {
 
     if (fram.length) {
       fram.forEach((f, i) => {
-        const head = i === 0 ? "Para " + (veh && veh.model ? "tu " + veh.label : "tu vehículo") + " el filtro" : "El filtro";
+        const head = i === 0 && veh && veh.model ? "Para tu " + veh.label + " el filtro" : "El filtro";
         let t = head + (f.cat ? " de " + f.cat : "") + " que corresponde es el Fram " + f.code + ".";
         if (f.it) { const l = lk(f.it); t += l ? " Podés agregarlo al carrito desde acá:" + l : " Lo tenemos disponible."; }
         else t += " En este momento no lo tenemos disponible.";
