@@ -56,6 +56,10 @@ textarea { resize: vertical; }
 .btn.main { font-family: var(--display); font-weight: 700; font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; background: var(--accent); color: var(--accent-ink); border: 0; padding: 11px 18px; }
 .btn.link { border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.hot { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.thread { display: grid; gap: 6px; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px; font-size: .88rem; }
+.thread ol { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; }
+.thread .row { justify-content: space-between; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 5px 11px; border-radius: 999px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -123,7 +127,13 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
         </div>
       </div>
       <input type="file" id="ocrFile" accept="image/*" hidden>
+      <div class="thread" id="thread" hidden>
+        <div class="row"><b>Conversación guardada</b><button class="btn link" id="clearThread" type="button">Borrar conversación</button></div>
+        <ol id="threadList"></ol>
+        <div class="status">Pega abajo lo que respondió el cliente: la respuesta tiene en cuenta todo lo anterior.</div>
+      </div>
       <textarea id="q" rows="3" placeholder="Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?"></textarea>
+      <div class="row"><button class="btn" id="saveQ" type="button">Guardar pregunta y esperar respuesta</button></div>
       <div class="status" id="ocrStatus"></div>
     </div>
 
@@ -1096,7 +1106,7 @@ const Engine = (() => {
   const findProd = (key) => catalog.find((it) => E.keyOf(it) === key) || null;
 
   function analyze() {
-    const q = $("q").value;
+    const q = fullQ();
     // Si cambió el vehículo, se limpia el código Fram (o se completa con uno guardado para ese vehículo y año)
     const v = E.extractVehicle(q);
     const k = vehKey(v);
@@ -1148,9 +1158,18 @@ const Engine = (() => {
     return { L, it: it || null };
   }
   let fichas = store.get("fichas", {});
+  // Conversación: preguntas anteriores del mismo cliente, se suman a la nueva para no perder el contexto
+  let thread = store.get("thread", []);
+  const fullQ = () => [...thread, $("q").value].filter((x) => x.trim()).join("\n");
+  function renderThread() {
+    $("thread").hidden = !thread.length;
+    const ol = $("threadList"); ol.textContent = "";
+    thread.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ol.append(li); });
+    $("q").placeholder = thread.length ? "Pega aquí la respuesta del cliente. Ej: es 2015, motor 1.6" : "Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?";
+  }
 
   function update() {
-    const q = $("q").value;
+    const q = fullQ();
     const intents = currentIntents();
     document.querySelectorAll("#intents .chip").forEach((c) => c.setAttribute("aria-pressed", String(intents.has(c.dataset.k))));
     const veh = E.extractVehicle(q);
@@ -1245,6 +1264,8 @@ const Engine = (() => {
     const ficha = prod ? fichas[E.keyOf(prod)] || null : null;
     $("answer").value = E.compose({ intents, prod: noBrand ? null : prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q,
       verdict: state.verdict, noBrand, variant, ficha });
+    // Si la respuesta le pide datos al cliente, se resalta el botón para guardar la pregunta
+    $("saveQ").classList.toggle("hot", /¿/.test($("answer").value) && !!$("q").value.trim());
     if (intents.has("ficha") && prod && !ficha && !state.verdict) fact("Ficha", "pegá la ficha técnica en la respuesta después de «Te paso la ficha.»: al copiar queda guardada para este producto.", "warn");
     updateCount();
     renderBank(q);
@@ -1307,11 +1328,18 @@ const Engine = (() => {
     update();
   });
   $("framCopyVeh").addEventListener("click", async () => {
-    const v = E.extractVehicle($("q").value);
+    const v = E.extractVehicle(fullQ());
     if (!v) { toast("No hay vehículo para copiar."); return; }
     try { await navigator.clipboard.writeText(v.label); toast("Copiado: " + v.label); } catch { toast(v.label); }
   });
-  $("clearQ").addEventListener("click", () => { $("q").value = ""; $("framCode").value = ""; state.framVehKey = null; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
+  $("saveQ").addEventListener("click", () => {
+    const t = $("q").value.trim();
+    if (!t) { toast("Primero pega la pregunta del cliente."); return; }
+    thread.push(t); store.set("thread", thread); $("q").value = ""; renderThread(); analyze(); $("q").focus();
+    toast("Guardada. Cuando el cliente responda, pégalo abajo.");
+  });
+  $("clearThread").addEventListener("click", () => { thread = []; store.set("thread", thread); renderThread(); analyze(); });
+  $("clearQ").addEventListener("click", () => { thread = []; store.set("thread", thread); renderThread(); $("q").value = ""; $("framCode").value = ""; state.framVehKey = null; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
   $("another").addEventListener("click", () => { state.seed++; update(); });
 
   async function copyText(text) {
@@ -1322,7 +1350,7 @@ const Engine = (() => {
     }
   }
   $("copy").addEventListener("click", async () => {
-    const a = $("answer").value.trim(), q = $("q").value.trim();
+    const a = $("answer").value.trim(), q = fullQ().trim();
     if (!a) { toast("No hay respuesta para copiar."); return; }
     const ok = await copyText(a);
     const fm = a.match(/paso la ficha\.?\s*([\s\S]{20,}?)\s*(Saludos\.?)?\s*$/i);
@@ -1608,6 +1636,7 @@ const Engine = (() => {
   loadSettingsForm(); saveCatalog(); renderVehicles(); renderPre();
   $("q").value = store.get("seenExample", false) ? "" : "Hola, ¿qué aceite y filtro lleva mi Peugeot 308 1.6 THP 2015? ¿Tienen stock?";
   store.set("seenExample", true);
+  renderThread();
   analyze();
 })();
 </script>
