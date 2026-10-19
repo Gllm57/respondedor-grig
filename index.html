@@ -331,6 +331,7 @@ const Engine = (() => {
     { key: "ficha", label: "Ficha técnica", re: /(ficha|dexos|\bgen ?[123]\b|\bapi\b|\bacea\b|homolog|especificaci|contiene|composici|valvula|antirretorno|\bes sae\b|que viscosidad es|norma (vw|psa|mb|bmw)|\bpea\b|\bilsac\b|sintetico o semi)/ },
     { key: "postventa", label: "Post-venta", re: /(ya compr|realice (la )?compra|hice (la|una) compra|mi (pedido|compra|paquete|envio)|preparando tu envio|seguimiento|no me (llego|entregaron)|cuando (lo )?despach|ya pague|compre hace)/ },
     { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
+    { key: "aceite", label: "Aceite", re: /(?<!filtros? (de |del |para )?)\baceites?\b|\b\d{1,2}w\d{2}\b|\blubricante/ },
     { key: "filtros", label: "Filtros", re: /filtro/ },
     { key: "kit", label: "Kit de filtros", re: /(\bkit\b|juego de \d? ?filtros|combo de filtros|todos los filtros|los 3 filtros|los tres filtros)/ },
     { key: "combo", label: "Combo / service", re: /(combo|incluye|viene con|todo lo (que|necesario)|service|cambio de aceite y filtro)/ },
@@ -790,9 +791,9 @@ const Engine = (() => {
     let asked = false, skipProdLink = false;
     const askData = () => { if (asked) return ""; asked = true; return pick("ask", ["Para confirmarte, ¿nos indicás marca, modelo, año y motor de tu vehículo?", "Así te asesoramos bien, ¿nos pasás marca, modelo, año y motor del vehículo?"]); };
     const wantsFilters = intents.has("filtros") || intents.has("kit") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
-    const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo");
+    const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo") || (intents.has("aceite") && !!(veh && veh.model));
     const ambiguous = !guide && veh && veh.model && options.length > 1;
-    const oilTalk = !isFilter || intents.has("litros") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
+    const oilTalk = !isFilter || intents.has("litros") || intents.has("aceite") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
 
     out.push("Buenas,");
     const finish = () => {
@@ -1243,7 +1244,7 @@ const Engine = (() => {
         fact("Combo en tu catálogo", parts.length ? parts.join(" · ") : "no encontré productos que nombren este vehículo", parts.length ? "" : "warn");
       }
       // Aceite: cuál es el que se va a ofrecer (con su link), para ubicarlo de un vistazo
-      const oilAsked = /\baceites?\b/.test(E.norm(q).replace(/filtros? (de |del |para )?aceite/g, "")) || E.viscOf(q).length || pv;
+      const oilAsked = intents.has("aceite") || E.viscOf(q).length || pv;
       const oilIt = alt || (prod && !/filtro/i.test(prod.t) && pv ? prod : combo.oil);
       const wantV = gv || E.viscOf(q)[0];
       if (oilIt && oilAsked) {
