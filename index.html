@@ -359,6 +359,7 @@ const Engine = (() => {
     { key: "ficha", label: "Ficha técnica", re: /(ficha|dexos|\bgen ?[123]\b|\bapi\b|\bacea\b|homolog|especificaci|contiene|composici|valvula|antirretorno|\bes sae\b|que viscosidad es|norma (vw|psa|mb|bmw)|\bpea\b|\bilsac\b|sintetico o semi)/ },
     { key: "postventa", label: "Post-venta", re: /(ya compr|realice (la )?compra|hice (la|una) compra|mi (pedido|compra|paquete|envio)|preparando tu envio|seguimiento|no me (llego|entregaron)|cuando (lo )?despach|ya pague|compre hace)/ },
     { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
+    { key: "marcas", label: "Marcas", re: /\bmarcas?\b|que (aceites|filtros|refrigerantes) (tienen|tenes|trabajan|manejan|venden)|(trabajan|manejan|venden) (con )?(que|cuales) /, },
     { key: "aceite", label: "Aceite", re: /(?<!filtros? (de |del |para )?)\baceites?\b|\b\d{1,2}w\d{2}\b|\blubricante/ },
     { key: "filtros", label: "Filtros", re: /filtro/ },
     { key: "kit", label: "Kit de filtros", re: /(\bkit\b|juego (de )?\d? ?filtros|combo de filtros|todos los filtros|los 3 filtros|los tres filtros)/ },
@@ -840,6 +841,28 @@ const Engine = (() => {
     return [...idx.values()].sort((a, b) => a.label.localeCompare(b.label));
   }
 
+  // Marcas que tiene la tienda, según sus publicaciones (las que más se publican primero)
+  const BRAND_LIST = {
+    aceite: [["valvoline", "Valvoline"], ["motul", "Motul"], ["petronas", "Petronas"], ["selenia", "Petronas"], ["puma", "Puma"], ["gulf", "Gulf"], ["mannol", "Mannol"],
+      ["totalenergies", "TotalEnergies"], ["total", "TotalEnergies"], ["elf", "Elf"], ["motorcraft", "Motorcraft"], ["shell", "Shell"], ["castrol", "Castrol"], ["ypf", "YPF"],
+      ["mobil", "Mobil"], ["liqui moly", "Liqui Moly"], ["mopar", "Mopar"], ["lasau", "Puma"]],
+    filtro: [["fram", "Fram"], ["mahle", "Mahle"], ["wega", "Wega"], ["sakura", "Sakura"], ["purflux", "Purflux"], ["mann", "Mann"], ["original", "Originales"]],
+    refrigerante: [["zerex", "Valvoline Zerex"], ["valvoline", "Valvoline"], ["motul", "Motul"], ["puma", "Puma"], ["gulf", "Gulf"], ["mannol", "Mannol"]],
+  };
+  function brandsOf(catalog, kind) {
+    const cnt = new Map();
+    catalog.forEach((it) => {
+      prep(it);
+      const k = /filtro/.test(it._n) ? "filtro" : /refrigerante|anticongelante|coolant|paraflu/.test(it._n) ? "refrigerante" : /\d{1,2}w\d{2}|aceite|atf|lubricante/.test(it._n) ? "aceite" : "";
+      if (k !== kind) return;
+      const b = BRAND_LIST[kind].find(([t]) => new RegExp("\\b" + t + "\\b").test(it._n));
+      if (b) cnt.set(b[1], (cnt.get(b[1]) || 0) + 1);
+    });
+    const out = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
+    // "Originales" va al final y aclarado
+    return out.includes("Originales") ? [...out.filter((n) => n !== "Originales"), "originales de fábrica"] : out;
+  }
+
   // Aceites del catálogo que le sirven a una entrada de la guía: primero la viscosidad indicada, después la alternativa.
   // Pesan la norma del fabricante en el título, el tipo de combustible y que el envase alcance para el cambio.
   function oilsForGuide(catalog, g, q = "", n = 3) {
@@ -905,7 +928,7 @@ const Engine = (() => {
   }
 
   function compose(ctx) {
-    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, fram = [], settings: S, seed = 0, q = "", verdict = null, noBrand = null, variant = null, ficha = null } = ctx;
+    const { brands = null, intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, fram = [], settings: S, seed = 0, q = "", verdict = null, noBrand = null, variant = null, ficha = null } = ctx;
     const pick = (key, arr) => arr[(seed + hash(key)) % arr.length];
     const P = prod ? prodName(prod.t) : "";
     const isFilter = prod && /filtro/i.test(prod.t);
@@ -957,6 +980,17 @@ const Engine = (() => {
       return finish();
     }
     if (intents.has("postventa") && S.postventa) { out.push(S.postventa); return finish(); }
+    // "¿Qué marcas de aceite tienen?": las marcas de la tienda y, si hay vehículo, sigue con el indicado
+    if (intents.has("marcas") && brands) {
+      const nq = norm(q);
+      const kind = /filtro/.test(nq) ? "filtro" : /refrigerante|anticongelante|coolant|paraflu/.test(nq) ? "refrigerante" : "aceite";
+      const list = brands[kind] || [];
+      const join = (a) => a.length > 1 ? a.slice(0, -1).join(", ") + " y " + a[a.length - 1] : a[0];
+      const what = { aceite: "aceites", filtro: "filtros", refrigerante: "refrigerantes" }[kind];
+      if (!list.length) return noStock();
+      out.push("En " + what + " trabajamos " + (list.length > 1 ? "las marcas " : "la marca ") + join(list) + ".");
+      if (!(veh && veh.model)) { out.push(kind === "filtro" ? "Si nos indicás marca, modelo, año y motor de tu vehículo, te pasamos el filtro que corresponde." : "Si nos indicás marca, modelo, año y motor de tu vehículo, te recomendamos el indicado."); return finish(); }
+    }
     // Si el cliente pide algo para su vehículo y falta el año o el motor, primero se pregunta (sin pasar links)
     if (veh && veh.model && !fram.length && !ambiguous && (wantsFilters || vehTalk)) {
       const falta = [!veh.year && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
@@ -1165,7 +1199,7 @@ const Engine = (() => {
     return { question, product, buyer };
   }
 
-  return { oilsForGuide, hasEngine, engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { brandsOf, oilsForGuide, hasEngine, engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -1445,7 +1479,7 @@ const Engine = (() => {
     // Mismo producto en otro tamaño
     const variant = !noBrand && prod ? findVariant(prod, q) : null;
     const ficha = prod ? fichas[E.keyOf(prod)] || null : null;
-    $("answer").value = E.compose({ intents, prod: noBrand ? null : prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q,
+    $("answer").value = E.compose({ brands: { aceite: E.brandsOf(catalog, "aceite"), filtro: E.brandsOf(catalog, "filtro"), refrigerante: E.brandsOf(catalog, "refrigerante") }, intents, prod: noBrand ? null : prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q,
       verdict: state.verdict, noBrand, variant, ficha });
     // Si la respuesta le pide datos al cliente, se resalta el botón para guardar la pregunta
     $("saveQ").classList.toggle("hot", /¿/.test($("answer").value) && !!$("q").value.trim());
