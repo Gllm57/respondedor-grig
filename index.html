@@ -685,7 +685,7 @@ const Engine = (() => {
     const lk = (it) => { if (!it || !S.link || !it.id || linked.has(it.id)) return ""; linked.add(it.id); return " " + linkOf(it); };
     const filterName = (t) => { const n = prodName(t).replace(/^filtro\s+(de\s+)?(aceite|aire acondicionado|aire|combustible|nafta|gasoil|habit[aá]culo|polen|cabina)\s*/i, ""); return n || prodName(t); };
     const out = [];
-    let asked = false;
+    let asked = false, skipProdLink = false;
     const askData = () => { if (asked) return ""; asked = true; return pick("ask", ["Para confirmarte, ¿nos indicás marca, modelo, año y motor de tu vehículo?", "Así te asesoramos bien, ¿nos pasás marca, modelo, año y motor del vehículo?"]); };
     const wantsFilters = intents.has("filtros") || intents.has("kit") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
     const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo");
@@ -803,7 +803,12 @@ const Engine = (() => {
         return finish();
       }
       const fl = combo.filters;
-      if (fl.length) out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+      if (fl.length) {
+        out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+        const kit = (combo.kits || [])[0];
+        if (kit) out.push("También tenemos el " + prodName(kit.t) + "." + lk(kit));
+        skipProdLink = true;
+      }
       else if (isFilter && !fram.length) out.push("Para tu " + veh.label + " tenemos el " + P + ".");
       else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
       else if (!isFilter && !asked) {
@@ -829,7 +834,7 @@ const Engine = (() => {
     if (intents.has("devolucion") && S.devolucion) out.push(S.devolucion);
     if (intents.has("combo")) out.push("Podés sumar el aceite y los filtros al carrito y comprarlos juntos.");
 
-    const linkProd = alt && pv && gv && pv !== gv ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
+    const linkProd = skipProdLink ? null : alt && pv && gv && pv !== gv ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
     const l = lk(linkProd);
     if (l) out.push(pick("link", ["Podés agregarlo al carrito desde acá:", "Te dejo el link para que lo agregues al carrito:"]) + l);
 
