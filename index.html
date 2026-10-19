@@ -102,6 +102,10 @@ textarea { resize: vertical; }
 .vcard .sec { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 4px; }
 .vcard .ln { font-size: .88rem; overflow-wrap: anywhere; }
 .vcard .code { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.vcard .eng { font-weight: 600; margin-top: 2px; }
+.vcard .oilit { padding-left: 12px; border-left: 2px solid var(--accent); }
+.vcard .oilit.none { color: var(--muted); border-left-color: var(--line); }
+.vcard .tag { font-family: var(--mono); font-size: .72rem; background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 .btn.main.wide { width: 100%; }
@@ -230,7 +234,7 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
   <section data-pane="veh" class="pane" hidden style="display:grid;gap:14px">
     <div class="panel">
       <div class="row between"><h2>Vehículos y sus productos</h2><span class="count" id="plCount"></span></div>
-      <p class="hint">Se arman solas con tus publicaciones: cada vehículo con los filtros (y su código Fram) y kits que lo nombran, el aceite de la guía y los códigos que guardaste al responder. Se actualizan cuando cargás más publicaciones.</p>
+      <p class="hint">Se arman solas con tus publicaciones: cada vehículo con el aceite indicado por motor y los aceites de tu catálogo que le sirven, los filtros (con su código Fram) y kits que lo nombran, y los códigos que guardaste al responder. Se actualizan cuando cargás más publicaciones.</p>
       <input type="search" id="plSearch" placeholder="Buscar: Gol Trend, Hilux, 208, PH5548…" aria-label="Buscar plantilla">
       <div id="plList"></div>
     </div>
@@ -393,11 +397,11 @@ const Engine = (() => {
     ...M("volkswagen", "up 1500 delivery constellation worker", true),
     ...M("chevrolet", "corsa classic onix prisma cruze tracker s10 trailblazer c10 c20 d20 spin agile celta astra vectra zafira meriva cobalt aveo captiva montana equinox sonic blazer silverado monza kadett corvette camaro omega"),
     ...M("chevrolet", "joy 400", true),
-    ...M("ford", "ka fiesta focus ecosport ranger territory mondeo maverick kuga escort transit falcon sierra f100 f150 f250 f4000 bronco orion galaxy courier explorer everest mustang cargo taunus fuego f14000"),
+    ...M("ford", "ka fiesta focus ecosport ranger territory mondeo maverick kuga escort transit falcon sierra f100 f150 f250 f4000 bronco orion galaxy courier explorer everest mustang cargo taunus f14000"),
     ...M("fiat", "palio siena uno punto cronos argo mobi toro strada fiorino idea duna pulse ducato doblo linea stilo bravo qubo fastback titano regatta tipo tempra spazio weekend adventure"),
     ...M("fiat", "500 128 147 600 125 1500", true),
     ...M("renault", "clio sandero logan kangoo duster stepway megane fluence kwid captur symbol oroch alaskan koleos twingo master scenic laguna trafic kardian arkana express"),
-    ...M("renault", "9 11 12 18 19 21 4 premium", true),
+    ...M("renault", "9 11 12 18 19 21 4 premium fuego", true),
     ...M("peugeot", "106 205 206 207 208 306 307 308 405 406 407 408 301 504 505 607 partner expert boxer rifter traveller"), ...M("peugeot", "2008 3008 5008 404", true),
     ...M("citroen", "c3 c4 c5 berlingo xsara picasso ds3 ds4 cactus lounge aircross saxo elysee jumpy jumper zx c15 c4l"),
     ...M("toyota", "hilux corolla etios yaris sw4 rav4 camry prius hiace prado cruiser fortuner innova corona tercel"),
@@ -450,7 +454,7 @@ const Engine = (() => {
     }
     if (MOTO_BRANDS.has(brand)) moto = true;
     const year = (n.match(/\b(19[5-9]\d|20[0-3]\d)\b/g) || []).find((y) => !(model && model.split(" ").includes(y))) || null;
-    const eng = n.match(/\b([0-6][.,]\d)(?:t|tsi|tfsi)?\b/);
+    const eng = n.match(/\b([0-6][.,]\d)(?:t|tsi|tfsi|d)?\b/);
     let cc = !eng && moto ? (n.match(/\b(\d{2,4})\s?cc\b/) || [])[1] : null;
     if (moto && !cc && mi >= 0 && /^\d{2,4}$/.test(toks[mi + (model.includes(" ") ? 2 : 1)] || "")) { const c = Number(toks[mi + (model.includes(" ") ? 2 : 1)]); if (c >= 50 && c <= 1300) cc = String(c); }
     const fuel = (n.match(/\b(tdi|hdi|jtd|dci|tsi|tdci|thp|diesel|nafta|gnc|turbo)\b/) || [])[1] || null;
@@ -581,7 +585,7 @@ const Engine = (() => {
     return s;
   }
   const prodName = (t) => {
-    let s = String(t).replace(/\s+para (auto|autos)\/?camioneta.*$/i, "").replace(/\s+-\s+.*$/, "").trim();
+    let s = String(t).replace(/\s+para (auto|autos)\/?camioneta.*$/i, "").replace(/\s+-\s+.*$/, "").trim().replace(/[.\s]+$/, "");
     if (s.length > 70) s = s.slice(0, 67).replace(/\s+\S*$/, "") + "…";
     return /^(aceite|filtro|refrigerante|bid[oó]n|liquido|líquido|paq)/i.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
   };
@@ -590,7 +594,7 @@ const Engine = (() => {
 
   // ---- Guía precargada de vehículos (datos orientativos: confirmar siempre con el manual)
   const VEH_DATA = [
-"Volkswagen|Gol Trend/Voyage/Saveiro|1.6 8v|2009-2023|nafta|5W-40|10W-40|3,5|VW 502.00",
+"Volkswagen|Gol Trend/Trend/Voyage/Saveiro|1.6 8v|2009-2023|nafta|5W-40|10W-40|3,5|VW 502.00",
 "Volkswagen|Gol/Gol Power|1.4 8v|2004-2012|nafta|5W-40|10W-40||VW 502.00",
 "Volkswagen|Gol/Senda/Saveiro|1.6 8v AP|1995-2012|nafta|15W-40|10W-40||API SL",
 "Volkswagen|Suran/Fox/CrossFox|1.6 8v|2006-2019|nafta|5W-40|10W-40|3,5|VW 502.00",
@@ -600,13 +604,13 @@ const Engine = (() => {
 "Volkswagen|Vento/Golf/Jetta|1.4 TSI|2014-2024|nafta|5W-40|||VW 502.00",
 "Volkswagen|Vento/Bora/Golf/Jetta|2.0 8v|2006-2015|nafta|5W-40|10W-40||VW 502.00",
 "Volkswagen|Vento/Bora|2.5|2006-2014|nafta|5W-40|||VW 502.00",
-"Volkswagen|Bora/Golf/Vento|1.9 TDI|1999-2014|diesel|5W-40|||VW 505.01",
+"Volkswagen|Bora/Golf/Vento/Caddy/Polo Classic|1.9 TDI|1999-2014|diesel|5W-40|||VW 505.01",
 "Volkswagen|Amarok|2.0 TDI|2010-2023|diesel|5W-30|||VW 507.00",
 "Volkswagen|Amarok|3.0 V6 TDI|2017-2025|diesel|5W-30|||VW 507.00",
 "Chevrolet|Corsa/Classic/Celta/Agile/Montana|1.4 8v|2006-2016|nafta|10W-40|15W-40||API SL",
 "Chevrolet|Corsa/Classic/Meriva|1.8 8v|2003-2012|nafta|10W-40|15W-40||API SL",
 "Chevrolet|Corsa/Classic|1.6 8v|1994-2010|nafta|15W-40|10W-40||API SL",
-"Chevrolet|Onix/Prisma|1.4|2012-2019|nafta|5W-30|10W-40||dexos1",
+"Chevrolet|Onix/Prisma/Joy|1.4|2012-2019|nafta|5W-30|10W-40||dexos1",
 "Chevrolet|Onix/Onix Plus|1.0 Turbo|2019-2025|nafta|5W-30|||dexos1 Gen2",
 "Chevrolet|Onix/Onix Plus|1.2|2019-2025|nafta|5W-30|||dexos1 Gen2",
 "Chevrolet|Tracker|1.2 Turbo|2020-2025|nafta|5W-30|||dexos1 Gen2",
@@ -620,12 +624,12 @@ const Engine = (() => {
 "Ford|Focus/EcoSport/Kuga|2.0|2008-2019|nafta|5W-30|5W-20||Ford WSS-M2C913",
 "Ford|Ranger|2.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
 "Ford|Ranger|3.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
-"Fiat|Palio/Siena/Grand Siena/Uno/Strada/Idea|1.4 Fire|2006-2020|nafta|15W-40|10W-40||API SL",
+"Fiat|Palio/Siena/Grand Siena/Uno/Strada/Idea/Fiorino/Punto|1.4 Fire|2006-2020|nafta|15W-40|10W-40||API SL",
 "Fiat|Cronos/Argo/Mobi/Strada/Pulse|1.3 Firefly|2018-2025|nafta|0W-20|||API SN Plus",
 "Fiat|Mobi/Uno/Argo|1.0 Firefly|2017-2025|nafta|0W-20|||API SN Plus",
 "Renault|Sandero/Logan/Kangoo/Clio/Symbol|1.6 8v K7M|2007-2020|nafta|10W-40|15W-40||RN0700",
-"Renault|Sandero/Logan/Duster/Kangoo/Captur/Fluence/Megane/Stepway|1.6 16v K4M|2007-2021|nafta|5W-40|10W-40|4,8|RN0700",
-"Renault|Duster/Fluence/Captur/Megane|2.0 F4R|2011-2021|nafta|5W-40|10W-40|5,4|RN0700",
+"Renault|Sandero/Logan/Duster/Oroch/Kangoo/Captur/Fluence/Megane/Clio/Stepway|1.6 16v K4M|2007-2021|nafta|5W-40|10W-40|4,8|RN0700",
+"Renault|Duster/Oroch/Fluence/Captur/Megane|2.0 F4R|2011-2021|nafta|5W-40|10W-40|5,4|RN0700",
 "Renault|Kangoo|1.5 dCi|2008-2020|diesel|5W-30|||RN0720",
 "Peugeot|206/207/Partner|1.4 8v TU3|2000-2015|nafta|10W-40|15W-40||PSA B71 2300",
 "Citroen|C3|1.4 8v TU3|2003-2012|nafta|10W-40|15W-40||PSA B71 2300",
@@ -648,11 +652,80 @@ const Engine = (() => {
 "Toyota|Yaris|1.5|2018-2025|nafta|0W-20|5W-30||API SN",
 "Honda|Civic|1.8|2006-2016|nafta|5W-20|0W-20||API SN",
 "Honda|Civic|2.0|2017-2021|nafta|0W-20|||API SN",
-"Honda|Fit/City|1.5|2009-2021|nafta|5W-20|0W-20||API SN",
+"Honda|Fit/City/WRV|1.5|2009-2021|nafta|5W-20|0W-20||API SN",
 "Honda|HRV|1.8|2015-2022|nafta|0W-20|5W-20||API SN",
 "Nissan|March/Versa/Note/Kicks|1.6|2011-2025|nafta|5W-30|10W-30||API SN",
 "Nissan|Frontier|2.3 dCi|2016-2025|diesel|5W-30|||ACEA C3",
-"Nissan|Sentra|1.8|2013-2019|nafta|5W-30|0W-20||API SN"
+"Nissan|Sentra|1.8|2013-2019|nafta|5W-30|0W-20||API SN",
+"Volkswagen|Gol MSI/Gol Trend|1.6 16v MSI|2017-2023|nafta|5W-40|5W-30|4|VW 502.00",
+"Volkswagen|Quantum/Santana/Gol|1.8 AP|1988-2002|nafta|20W-50|15W-40|4|API SL",
+"Volkswagen|Polo Classic/Caddy|1.6|1996-2008|nafta|15W-40|10W-40|4|API SL",
+"Volkswagen|Passat/Tiguan/Golf|2.0 TSI|2008-2020|nafta|5W-40|5W-30|4,6|VW 502.00",
+"Volkswagen|Tiguan/Passat|2.0 TDI|2010-2023|diesel|5W-30|5W-40|4,5|VW 507.00",
+"Audi|A3/Q3|1.4 TFSI|2013-2021|nafta|5W-40|5W-30|4|VW 502.00",
+"Audi|A3/A4/A5/Q3/Q5|2.0 TFSI|2008-2020|nafta|5W-40|5W-30|4,6|VW 502.00",
+"BMW|318|1.8|1992-1998|nafta|10W-40|15W-40|4,3|API SL",
+"BMW|318i/320i/325i/320/325/E46/E90|2.0/2.5|1998-2012|nafta|5W-30|5W-40|4,5|BMW LL-01",
+"BMW|X3/X5/E83/E53/E70|3.0d M57|2003-2013|diesel|5W-30|5W-40|6,5|BMW LL-04",
+"Chevrolet|400|2.5/3.8|1969-1995|nafta|20W-50|15W-40|5|API SL",
+"Chevrolet|C10|4.1|1970-1995|nafta|20W-50|15W-40|5,5|API SL",
+"Chevrolet|D20|4.0 diesel|1985-1997|diesel|15W-40||7|API CI-4",
+"Chevrolet|Blazer/S10|2.8 TD|1997-2011|diesel|15W-40|10W-40|6|API CI-4",
+"Chevrolet|Blazer/S10|2.2/2.4|1995-2011|nafta|15W-40|10W-40|4,5|API SL",
+"Chevrolet|Captiva|2.4|2008-2017|nafta|5W-30|10W-40|4,7|dexos1",
+"Chevrolet|Captiva|2.2 VCDi|2011-2017|diesel|5W-30||5,8|dexos2",
+"Citroen|Jumper|2.2 HDi|2010-2022|diesel|5W-30||6|PSA B71 2290",
+"Peugeot|Boxer|2.2 HDi|2010-2022|diesel|5W-30||6|PSA B71 2290",
+"Peugeot|306/405|1.6/1.8/2.0|1990-2002|nafta|15W-40|10W-40|4,5|API SL",
+"Peugeot|306/405|1.9 D|1990-2002|diesel|15W-40|10W-40|4,5|API CF-4",
+"Fiat|Fiorino/Uno/Palio|1.3 Fire|2005-2014|nafta|15W-40|10W-40|3|API SL",
+"Fiat|Duna/Uno/Tipo/Regatta|1.4/1.6|1985-2000|nafta|20W-50|15W-40|4|API SL",
+"Fiat|Palio/Siena/Idea/Punto/Strada/Toro|1.6/1.8 E.torQ|2010-2021|nafta|15W-40|10W-40|4,5|API SL",
+"Fiat|500|1.4|2011-2019|nafta|5W-40|10W-40|2,8|ACEA A3",
+"Fiat|Toro|2.0 Multijet|2016-2025|diesel|5W-30||4,9|ACEA C2",
+"Fiat|Ducato|2.3 Multijet|2010-2023|diesel|5W-30||6|ACEA C2",
+"Ford|Falcon/Sierra/Taunus|2.3/3.0/3.6|1970-1993|nafta|20W-50|15W-40|4,5|API SL",
+"Ford|Escort/Galaxy/Orion|1.6/1.8|1988-1996|nafta|20W-50|15W-40|4|API SL",
+"Ford|Fiesta Max/Fiesta/EcoSport|1.6 Rocam|2003-2014|nafta|5W-30|10W-40|4,25|Ford WSS-M2C913",
+"Ford|Mondeo|2.0/2.3|2008-2015|nafta|5W-30|5W-20|4,3|Ford WSS-M2C913",
+"Ford|Transit|2.2 TDCi|2014-2022|diesel|5W-30||6,2|Ford WSS-M2C913",
+"Ford|Cargo|Cummins|2005-2025|diesel|15W-40||15|API CI-4",
+"Ford|F14000|MWM 6 cil|1990-2010|diesel|15W-40||16|API CI-4",
+"Honda|Accord|2.0/2.4|2003-2017|nafta|5W-20|5W-30|4,2|API SN",
+"Honda|Accord/Prelude|1.6/1.8|1976-1982|nafta|20W-50|15W-40|3,5|API SL",
+"Honda|CRV|2.0/2.4|2007-2021|nafta|0W-20|5W-20|4,2|API SN",
+"Hyundai|Accent|1.5|1994-2003|nafta|15W-40|10W-40|3,5|API SL",
+"Hyundai|i10|1.1/1.2|2008-2020|nafta|5W-30|10W-40|3,2|API SN",
+"Jeep|Cherokee/Grand Cherokee|3.6 V6|2011-2021|nafta|5W-20|5W-30|5,7|Chrysler MS-6395",
+"Jeep|Renegade/Compass|1.8 E.torQ|2016-2021|nafta|15W-40|10W-40|4,5|API SL",
+"Jeep|Renegade/Compass|2.0 Multijet|2016-2021|diesel|5W-30||4,9|ACEA C2",
+"Dodge|Journey|2.4|2009-2018|nafta|5W-20|5W-30|4,7|Chrysler MS-6395",
+"Ram|2500|5.9/6.7 Cummins|2004-2018|diesel|15W-40||11,4|API CI-4",
+"Kia|K2500|2.5 diesel|2005-2022|diesel|15W-40|10W-40|6,5|API CI-4",
+"Mazda|626|2.0 diesel|1997-2002|diesel|15W-40|10W-40|4,5|API CF-4",
+"Mercedes-Benz|608/915/1114/1315/1418/1518/1620/1621/1634/1722/710/LS1526/Atego/Axor/Accelo/Actros|diesel|1980-2025|diesel|15W-40|10W-40|15|MB 228.3",
+"Mercedes-Benz|C200/C250/C180/E250/GLK/W204/W212|1.8/2.0 Turbo|2008-2016|nafta|5W-40|5W-30|6,5|MB 229.5",
+"Mercedes-Benz|Sprinter/Vito|2.1/2.2 CDI|2010-2025|diesel|5W-30|5W-40|9,5|MB 229.51",
+"Mitsubishi|L200|2.5 Di-D|2008-2015|diesel|15W-40|5W-30|6,5|API CF-4",
+"Mitsubishi|L200|2.4 Di-D|2016-2025|diesel|5W-30||6,5|ACEA C3",
+"Mitsubishi|Space Wagon|2.0 TD|1992-1998|diesel|15W-40||5|API CF-4",
+"Nissan|NP300|2.5 dCi|2008-2015|diesel|15W-40|5W-30|6|API CF-4",
+"Nissan|Pickup/D21/D22|2.5/2.7 diesel|1990-2008|diesel|15W-40||5,7|API CF-4",
+"Renault|4/6/12/18/11/9/19/21/Fuego|1.0-2.2|1970-1998|nafta|20W-50|15W-40|4|API SL",
+"Renault|Clio Mio/Clio/Kangoo|1.2 16v D4F|2006-2016|nafta|10W-40|5W-40|4|RN0700",
+"Renault|Koleos|2.5|2009-2016|nafta|5W-30|5W-40|4,6|RN0700",
+"Renault|Premium|DXi|2006-2020|diesel|15W-40|10W-40|30|ACEA E7",
+"Scania|G360/G380/G410/P310/P360/P420/R440/R500/113/124|DC|1990-2025|diesel|15W-40|10W-40|30|ACEA E7 / API CI-4",
+"Deere|445/730/940/5705/6110|diesel|1960-2015|diesel|15W-40||10|API CI-4",
+"Daihatsu|Charade/Cuore/Terios|1.0/1.3|1990-2005|nafta|15W-40|10W-40|3,2|API SL",
+"Subaru|Justy|1.2|1988-1996|nafta|15W-40|10W-40|3|API SL",
+"Suzuki|Swift|1.2/1.4|2010-2020|nafta|5W-30|0W-20|3,4|API SN",
+"Suzuki|Vitara/Grand Vitara|1.6/2.0|1998-2015|nafta|10W-40|5W-30|4,2|API SL",
+"Toyota|Camry|2.4/2.5|2007-2017|nafta|5W-30|0W-20|4,4|API SN",
+"Toyota|RAV4|2.0/2.4|2006-2018|nafta|5W-30|0W-20|4,2|API SN",
+"Toyota|Innova|2.7|2016-2025|nafta|5W-30|0W-20|4,4|API SN",
+"Toyota|Prado|3.0 D-4D|2003-2016|diesel|15W-40|5W-30|7|API CF-4",
+"Bajaj|Boxer|150cc|2010-2025|nafta|20W-50|10W-40|1,1|JASO MA"
 ];
   const brandKeyOf = (marca) => { const n = norm(marca); return Object.keys(BRANDS).find((k) => k === n || BRANDS[k].includes(n)) || null; };
   const VEHICLES = VEH_DATA.map((l) => {
@@ -731,11 +804,20 @@ const Engine = (() => {
       if (m.needBrand && !brands.has(m.brand)) return;
       if (brands.size && !brands.has(m.brand) && (MODELS[x] || []).some((o) => brands.has(o.brand))) return;
       if (/^(19|20)\d\d$/.test(x)) return;
+      // Un repuesto de auto ("Fiat Ducato Boxer") no es para la moto del mismo nombre (Bajaj Boxer)
+      if (m.moto && brands.size && !brands.has(m.brand)) return;
       let model = x;
       if (MULTI.has(x + " " + (toks[i + 1] || ""))) model = x + " " + toks[i + 1];
       out.set(m.brand + "|" + model, { brand: m.brand, model });
     }));
     return [...out.values()];
+  }
+  // Motor "conocido": lo dijo el cliente, es moto (cc), o el modelo tiene un solo motor sin cilindrada (camiones, tractores)
+  function hasEngine(veh) {
+    if (!veh) return false;
+    if (veh.engine || /\d+cc/.test(veh.label)) return true;
+    const vs = VEHICLES.filter((v) => v.brand === veh.brand && v.modelos.some((m) => norm(m) === veh.model));
+    return vs.length > 0 && vs.every((v) => !/\d[.,]\d|\dcc/.test(v.motor));
   }
   function engineVariants(veh) {
     if (!veh || !veh.model) return 0;
@@ -758,24 +840,39 @@ const Engine = (() => {
     return [...idx.values()].sort((a, b) => a.label.localeCompare(b.label));
   }
 
+  // Aceites del catálogo que le sirven a una entrada de la guía: primero la viscosidad indicada, después la alternativa.
+  // Pesan la norma del fabricante en el título, el tipo de combustible y que el envase alcance para el cambio.
+  function oilsForGuide(catalog, g, q = "", n = 3) {
+    const vs = [g.visc, g.alt].filter(Boolean).map((v) => viscOf(v)[0]).filter(Boolean);
+    if (!vs.length) return [];
+    const need = g.litros ? parseFloat(String(g.litros).replace(",", ".")) : 4;
+    const qt = tokens(q).filter((t) => t.length > 3);
+    const moto = /cc\b/.test(g.motor || "");
+    const normaT = g.norma ? tokens(g.norma).filter((t) => /\d/.test(t) && t.length >= 3) : [];
+    // Diésel: mejor un aceite apto diésel; nafta: no ofrecer uno de flota/camión
+    const dsl = /diesel/.test(g.comb || ""), DSL = /diesel|fleet|turbo ?d|\b(ck|ci|cj|cf)-?4?\b|505|507|\bc[234]\b|tdi|hdi/, NFT = /\bgdi\b|nafta|gasolin/;
+    const heavy = need >= 10;
+    const fuelSc = (t) => heavy ? (/fleet|camion|\b(ci|ck|cj)-?4\b|turbo ?diesel|e7/.test(t) ? 6 : 0) - (NFT.test(t) ? 5 : 0)
+      : dsl ? (DSL.test(t) ? 3 : 0) - (NFT.test(t) ? 5 : 0) : (/fleet|camion/.test(t) ? -3 : 0);
+    const mods = g.modelos.map((m) => norm(m)).filter((m) => m.length > 2);
+    const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0)
+      + (normaT.some((t) => it._n.includes(t)) ? 4 : 0) + fuelSc(it._n) + (mods.some((m) => it._n.includes(m)) ? 2 : 0)
+      - (!heavy && /\b\d+\s*(bidones|unidades|u)\b|caja|balde|pack|paq|\bx\s*20\s*l/.test(it._n) ? 2 : 0); };
+    const out = [];
+    vs.forEach((v) => {
+      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, v) && !/filtro|\bkit\b|caja (manual|autom)|diferencial|transmision|atf|cvt/.test(it._n) && (moto ? /\b(2t|4t|moto)\b/.test(it._n) : !/\b(2t|4t|moto)\b/.test(it._n)); });
+      oils.sort((a, b) => sc(b) - sc(a)).forEach((it) => { if (out.length < n && !out.includes(it)) out.push(it); });
+    });
+    return out;
+  }
+
   function comboFor(catalog, veh, g, q) {
     const res = { oil: null, filters: [], kits: [] };
     if (!veh || !veh.model) return res;
     const mt = veh.model.split(" ");
     const has = (n, t) => new RegExp("(^|[^a-z0-9])" + t.replace(/[.+]/g, "\\$&") + "([^a-z0-9]|$)").test(n);
     const gv = g && g.visc ? viscOf(g.visc)[0] : null;
-    if (gv) {
-      const need = g.litros ? parseFloat(String(g.litros).replace(",", ".")) : 4;
-      const qt = tokens(q).filter((t) => t.length > 3);
-      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !/filtro|\b(2t|4t|moto)\b/.test(it._n); });
-      // La norma del fabricante (ej. VW 507.00) en el título pesa más que el tamaño del envase
-      const normaT = g.norma ? tokens(g.norma).filter((t) => /\d/.test(t) && t.length >= 3) : [];
-      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0) + (normaT.some((t) => it._n.includes(t)) ? 4 : 0) + fuelSc(it._n); };
-      // Diésel: mejor un aceite apto diésel; nafta: no ofrecer uno de flota/camión
-      const dsl = /diesel/.test(g.comb || ""), DSL = /diesel|fleet|turbo ?d|\b(ck|ci|cj|cf)-?4?\b|505|507|\bc[234]\b|tdi|hdi/, NFT = /\bgdi\b|nafta|gasolin/;
-      function fuelSc(n) { return dsl ? (DSL.test(n) ? 3 : 0) - (NFT.test(n) ? 5 : 0) : (/fleet|camion/.test(n) ? -3 : 0); }
-      res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
-    }
+    if (gv) res.oil = oilsForGuide(catalog, g, q, 1)[0] || null;
     const byCat = {};
     const vq = norm(q + " " + veh.label);
     const vehDiesel = (g && g.comb === "diesel") || /diesel|gasoil|\b(tdi|hdi|dci|tdci|crdi|jtd|td|d4d)\b/.test(vq);
@@ -862,7 +959,7 @@ const Engine = (() => {
     if (intents.has("postventa") && S.postventa) { out.push(S.postventa); return finish(); }
     // Si el cliente pide algo para su vehículo y falta el año o el motor, primero se pregunta (sin pasar links)
     if (veh && veh.model && !fram.length && !ambiguous && (wantsFilters || vehTalk)) {
-      const falta = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+      const falta = [!veh.year && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
       if (falta) { out.push("¿Me podrías indicar el " + falta + " de tu " + veh.label + "?"); return finish(); }
     }
 
@@ -931,14 +1028,14 @@ const Engine = (() => {
     } else if (wantsFilters && veh && veh.model) {
       // Sin año o motor no se sabe qué filtro lleva: se pregunta antes de ofrecer nada
       // Solo se pregunta año/motor si hay más de una opción posible (o ninguna y faltan datos)
-      const missF = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+      const missF = [!veh.year && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
       const askMiss = () => { out.length = 1; out.push("¿Me podrías indicar el " + missF + " de tu " + veh.label + "?"); return finish(); };
       const kits = combo.kits || [];
       // "los filtros" sin decir cuál: se ofrece el kit, y si no hay kit, cada filtro con su publicación
       const typedF = /filtros? (de |del |para el |para )?(aceite|aire|combustible|nafta|gas\s?oil|habitaculo|polen|cabina)/.test(norm(q));
       const generalF = intents.has("filtros") && !typedF && !intents.has("combo") && !fram.length;
       if (intents.has("kit") || generalF) {
-        const needEngineK = !(veh.engine || /\d+cc/.test(veh.label)) && engineVariants(veh) > 1;
+        const needEngineK = !hasEngine(veh) && engineVariants(veh) > 1;
         if (missF && (kits.length > 1 || needEngineK || (!kits.length && (combo.ambiguous || !combo.filters.length)))) return askMiss();
         if (intents.has("kit")) out.length = 1;
         else for (let i = out.length - 1; i > 0; i--) if (/^Sí, (hay stock|tenemos|el .* está disponible|contamos)/.test(out[i])) out.splice(i, 1);
@@ -954,7 +1051,7 @@ const Engine = (() => {
         else return noStock();
         return finish();
       }
-      const needEngine = !(veh.engine || /\d+cc/.test(veh.label)) && engineVariants(veh) > 1;
+      const needEngine = !hasEngine(veh) && engineVariants(veh) > 1;
       if (missF && (combo.ambiguous || needEngine || (!combo.filters.length && !isFilter))) return askMiss();
       const fl = combo.filters;
       if (fl.length) {
@@ -967,7 +1064,7 @@ const Engine = (() => {
       else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
       else if (!isFilter && !asked) {
         asked = true;
-        const miss = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+        const miss = [!veh.year && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
         // Con todos los datos y sin filtro en el catálogo: se avisa que no hay stock
         if (!miss) return noStock();
         out.push("¿Me podrías indicar el " + miss + " de tu " + veh.label + "?");
@@ -1068,7 +1165,7 @@ const Engine = (() => {
     return { question, product, buyer };
   }
 
-  return { engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { oilsForGuide, hasEngine, engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -1296,7 +1393,7 @@ const Engine = (() => {
       } else if (oilAsked && veh && veh.model && m.options.length > 1 && !g) fact("Aceite", "depende del motor: falta año y motor", "warn");
       else if (oilAsked && wantV) fact("Aceite", "no encontré un " + wantV.toUpperCase().replace("W", "W-") + " en tu catálogo", "warn");
       const filterQ = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia");
-      if (filterQ && veh && veh.model && veh.year && (veh.engine || /\d+cc/.test(veh.label)) && !combo.filters.length && !E.parseCodes($("framCode").value).length && !(prod && /filtro/i.test(prod.t)))
+      if (filterQ && veh && veh.model && veh.year && E.hasEngine(veh) && !combo.filters.length && !E.parseCodes($("framCode").value).length && !(prod && /filtro/i.test(prod.t)))
         fact("Ojo", "no encontré filtros para este vehículo en tu catálogo, así que la respuesta dice que no hay stock. Si lo tienes, escribe el código Fram.", "warn");
       const vs = E.viscOf(q); if (vs.length) fact("Viscosidad", vs.map((v) => v.toUpperCase().replace("W", "W-")).join(", "));
       if (!intents.size) fact("Tema", "no lo detecté, elige uno abajo", "warn");
@@ -1694,7 +1791,8 @@ const Engine = (() => {
   function renderPlantillas() {
     const idx = E.buildIndex(catalog);
     const qq = E.norm($("plSearch").value.trim());
-    const list = idx.filter((v) => !qq || E.norm(v.label).includes(qq) || v.items.some((x) => (x.code || "").toLowerCase().includes(qq.replace(/\s/g, ""))));
+    const words = qq.split(/\s+/).filter(Boolean);
+    const list = idx.filter((v) => !qq || words.every((w) => E.norm(v.label).includes(w)) || v.items.some((x) => (x.code || "").toLowerCase().includes(qq.replace(/\s/g, ""))));
     $("plCount").textContent = idx.length + " vehículos";
     const box = $("plList"); box.textContent = "";
     if (!list.length) { box.innerHTML = '<p class="hint">No hay plantillas que coincidan. Cargá más publicaciones de filtros en Catálogo.</p>'; return; }
@@ -1710,7 +1808,24 @@ const Engine = (() => {
         c.append(d);
       };
       const g = E.VEHICLES.filter((x) => x.brand === v.brand && x.modelos.some((m) => E.norm(m) === v.model));
-      if (g.length) { addSec("Aceite (guía orientativa)"); g.forEach((x) => addLine("", x.motor + " (" + x.y1 + "-" + x.y2 + "): " + x.visc + (x.alt ? " / " + x.alt : "") + (x.litros ? " · " + x.litros + " L" : "") + (x.norma ? " · " + x.norma : ""))); }
+      if (g.length) {
+        addSec("Aceite indicado y los que tenemos");
+        g.forEach((x) => {
+          const d = document.createElement("div"); d.className = "ln eng";
+          d.textContent = x.motor + " (" + x.y1 + "-" + x.y2 + (x.comb ? ", " + x.comb : "") + "): " + x.visc + (x.alt ? " / " + x.alt : "") + (x.litros ? " · " + x.litros + " L" : "") + (x.norma ? " · " + x.norma : "");
+          c.append(d);
+          const oils = E.oilsForGuide(catalog, x, "", 3);
+          if (!oils.length) { const w = document.createElement("div"); w.className = "ln oilit none"; w.textContent = "No tenemos un " + x.visc + (x.alt ? " ni " + x.alt : "") + " publicado."; c.append(w); }
+          oils.forEach((it) => {
+            const o = document.createElement("div"); o.className = "ln oilit";
+            const v = E.viscOf(it.t).find((w) => [x.visc, x.alt].some((g) => g && E.viscOf(g)[0] === w)) || E.viscOf(it.t)[0];
+            o.append(it.t + " ");
+            if (v) { const t = document.createElement("span"); t.className = "tag"; t.textContent = v.toUpperCase().replace("W", "W-"); o.append(t, " "); }
+            if (it.id) { const a = document.createElement("a"); a.href = E.linkOf(it); a.target = "_blank"; a.rel = "noopener"; a.textContent = "ver publicación"; o.append(a); }
+            c.append(o);
+          });
+        });
+      }
       Object.keys(KIND).forEach((k) => {
         const its = v.items.filter((x) => x.kind === k);
         if (!its.length) return;
