@@ -1108,7 +1108,9 @@ const Engine = (() => {
       if (!(veh && veh.model)) { out.push(kind === "filtro" ? "Si nos indicás marca, modelo, año y motor de tu vehículo, te pasamos el filtro que corresponde." : "Si nos indicás marca, modelo, año y motor de tu vehículo, te recomendamos el indicado."); return finish(); }
     }
     // Si el cliente pide algo para su vehículo y falta el año o el motor, primero se pregunta (sin pasar links)
-    if (veh && veh.model && !fram.length && !ambiguous && (wantsFilters || vehTalk)) {
+    // Para el aceite el año solo importa si cambia la recomendación: si la guía ya da un único aceite, no se pregunta
+    const oilResolved = !wantsFilters && guide && gv;
+    if (veh && veh.model && !fram.length && !ambiguous && !oilResolved && (wantsFilters || vehTalk)) {
       const falta = [!veh.year && !veh.moto && "año", !hasEngine(veh) && "motor"].filter(Boolean).join(" y ");
       if (falta) { out.push("¿Me podrías indicar el " + falta + " de tu " + veh.label + "?"); return finish(); }
     }
@@ -1849,7 +1851,7 @@ const Engine = (() => {
   });
 
   // ---- Catálogo
-  const APP_VERSION = "20.1";
+  const APP_VERSION = "20.2";
   function saveCatalog() { store.set("catalog", catalog); $("catBadge").textContent = catalog.length + " productos · versión " + APP_VERSION; $("catCount").textContent = catalog.length + " productos"; }
   function renderCatList() {
     const box = $("catList"); box.textContent = "";
