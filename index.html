@@ -851,7 +851,7 @@ const Engine = (() => {
   };
   const DEFAULTS = {
     trato: "vos", link: "1",
-    despedida: "¡Quedamos a disposición! Saludos, equipo grig.",
+    despedida: "Saludos.",
     envio: "Hacemos envíos a todo el país por Mercado Envíos. En la publicación podés ver cuándo te llega según tu código postal; en muchas zonas llega en el día.",
     factura: "Sí, emitimos factura. Una vez hecha la compra, cargá tus datos de facturación en Mercado Libre.",
     pago: "Podés pagar con todos los medios que ofrece Mercado Pago, incluso en cuotas.",
@@ -869,6 +869,8 @@ const Engine = (() => {
   let guide = store.get("vehicles", []);
   let bank = store.get("bank", []);
   let settings = { ...DEFAULTS, ...store.get("settings", {}) };
+  // La despedida vieja de fábrica pasa a ser solo "Saludos."
+  if (settings.despedida === "¡Quedamos a disposición! Saludos, equipo grig.") { settings.despedida = DEFAULTS.despedida; store.set("settings", settings); }
 
   let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0, listing: "", listingKey: null, framVehKey: null };
   let framMem = store.get("framMem", {});
