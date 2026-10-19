@@ -881,6 +881,10 @@ const Engine = (() => {
     return out.includes("Originales") ? [...out.filter((n) => n !== "Originales"), "originales de fábrica"] : out;
   }
 
+  // Filtro de partículas (DPF/FAP): necesita aceite bajo en cenizas (Low SAPS, ACEA C)
+  const DPF_Q = /\b(dpf|fap)\b|filtro (de )?particulas/;
+  const LOW_SAPS = /x-?clean|\bc[1-5]\b|acea ?c\d|low ?saps|mid ?saps|\b50[47]\b|dexos ?2|\bdpf\b|229\.5[12]|ll-?04|\bxl-?iii\b|ineo|mc3/i;
+
   // Aceites del catálogo que le sirven a una entrada de la guía: primero la viscosidad indicada, después la alternativa.
   // Pesan la norma del fabricante en el título, el tipo de combustible y que el envase alcance para el cambio.
   function oilsForGuide(catalog, g, q = "", n = 3) {
@@ -898,7 +902,8 @@ const Engine = (() => {
     const mods = g.modelos.map((m) => norm(m)).filter((m) => m.length > 2);
     const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0)
       + (normaT.some((t) => it._n.includes(t)) ? 4 : 0) + fuelSc(it._n) + (mods.some((m) => it._n.includes(m)) ? 2 : 0)
-      - (!heavy && /\b\d+\s*(bidones|unidades|u)\b|caja|balde|pack|paq|\bx\s*20\s*l/.test(it._n) ? 2 : 0); };
+      - (!heavy && /\b\d+\s*(bidones|unidades|u)\b|caja|balde|pack|paq|\bx\s*20\s*l/.test(it._n) ? 2 : 0)
+      + (DPF_Q.test(norm(q)) ? (LOW_SAPS.test(it.t) ? 6 : -6) : 0); };
     const out = [];
     vs.forEach((v) => {
       const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, v) && !/filtro|\bkit\b|caja (manual|autom)|diferencial|transmision|atf|cvt|nautic|outboard|marine/.test(it._n) && (moto ? /\b(2t|4t|moto)\b/.test(it._n) : !/\b(2t|4t|moto)\b/.test(it._n)); });
@@ -962,6 +967,8 @@ const Engine = (() => {
     const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo") || (intents.has("aceite") && !!(veh && veh.model));
     const ambiguous = !guide && veh && veh.model && options.length > 1;
     const motoMis = !!(prod && !isFilter && veh && veh.model && (!!veh.moto !== /\b(4t|2t|moto)\b/i.test(prod.t)));
+    const dpfAsk = DPF_Q.test(norm(q)), dpfMis = !!(prod && pv && dpfAsk && !LOW_SAPS.test(prod.t));
+    const useAlt = !!(alt && pv && (motoMis || dpfMis || (gv && pv !== gv)));
     const oilTalk = !isFilter || intents.has("litros") || intents.has("aceite") || intents.has("combo") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
 
     out.push("Buenas,");
@@ -1123,13 +1130,18 @@ const Engine = (() => {
       if (parts.length) out.push("Para tu " + veh.label + " " + parts.join(" y ") + ".");
       if (prod && pv && gv) {
         const av = guide.alt ? viscOf(guide.alt)[0] : null;
-        if (motoMis) out.push("El " + P + " es un aceite para " + (veh.moto ? "autos, no para moto" : "moto, no para autos") + (alt ? ". Para tu " + veh.label + " te recomendamos el " + prodName(alt.t) + "." : "."));
+        if (dpfMis && !motoMis) {
+          const vOk = pv === gv || pv === av;
+          out.push("El " + P + (vOk ? " es " + fmtVisc(pv) + ", pero no es bajo en cenizas" : " no es el indicado: es " + fmtVisc(pv) + " y no es bajo en cenizas") + ". Para tu " + veh.label + " con filtro de partículas (DPF) conviene un " + (vOk ? "" : fmtVisc(gv) + " ") + "Low SAPS (ACEA C2/C3)" + (alt ? ", como el " + prodName(alt.t) + "." : "."));
+        }
+        else if (motoMis) out.push("El " + P + " es un aceite para " + (veh.moto ? "autos, no para moto" : "moto, no para autos") + (alt ? ". Para tu " + veh.label + " te recomendamos el " + prodName(alt.t) + "." : "."));
         else if (pv !== gv && pv === av) out.push("El " + P + " es " + fmtVisc(pv) + ", que también está indicado para tu vehículo, así que te sirve.");
         else if (pv === gv) out.push(pick("ok", ["El " + P + " cumple con esa viscosidad, así que es el indicado.", "El " + P + " es " + fmtVisc(pv) + ", así que te va perfecto."]));
         else out.push("El " + P + " es " + fmtVisc(pv) + ", por eso te recomendamos un " + fmtVisc(gv) + (alt ? ": el " + prodName(alt.t) + " es ideal." : "."));
       } else if ((!prod || isFilter) && oilTalk && combo.oil) {
         out.push(pick("oilrec", ["De nuestra tienda te recomendamos el " + prodName(combo.oil.t) + ".", "El ideal de nuestra tienda es el " + prodName(combo.oil.t) + "."]) + lk(combo.oil));
       }
+      if (dpfAsk && prod && pv && !dpfMis && LOW_SAPS.test(prod.t)) out.push("Además es bajo en cenizas (Low SAPS), apto para motores con filtro de partículas (DPF).");
       if (guide.nota) out.push("Dato útil: " + guide.nota + ".");
       if (guide.pre && parts.length) out.push("Igualmente te recomendamos confirmarlo en el manual del vehículo.");
     } else if (vehTalk && ambiguous) {
@@ -1146,7 +1158,7 @@ const Engine = (() => {
     }
 
     if (intents.has("litros")) {
-      const oil = alt && pv && gv && (pv !== gv || motoMis) ? alt : prod && !isFilter ? prod : combo.oil;
+      const oil = useAlt ? alt : prod && !isFilter ? prod : combo.oil;
       const pl = oil ? litersOf(oil.t) : null;
       const gl = guide && guide.litros ? parseFloat(String(guide.litros).replace(",", ".")) : null;
       if (gl && pl && pl < gl) out.push("Como el envase es de " + String(pl).replace(".", ",") + " litros, vas a necesitar " + Math.ceil(gl / pl) + " unidades para el cambio completo.");
@@ -1244,7 +1256,7 @@ const Engine = (() => {
 
     const INFO = new Set(["factura", "envio", "pago", "original", "retiro", "devolucion", "reclamo", "foto", "consejo", "marcas", "postventa", "precio"]);
     const infoOnly = [...intents].some((k) => INFO.has(k)) && [...intents].every((k) => INFO.has(k) || (k === "aceite" && !(veh && veh.model)));
-    const linkProd = skipProdLink || infoOnly ? null : alt && pv && gv && (pv !== gv || motoMis) ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
+    const linkProd = skipProdLink || infoOnly ? null : useAlt ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
     if (out.length === 1 && linkProd && linkProd === prod) out.push("Sí, tenemos el " + P + ".");
     if (out.length === 1 && !prod && intents.has("stock") && /\b\d+([.,]\d+)? ?(l|lt|lts|litros?)\b/.test(norm(q))) out.push("¿De qué aceite lo buscás (marca y viscosidad)? Así te pasamos el link.");
     const l = lk(linkProd);
@@ -1326,7 +1338,7 @@ const Engine = (() => {
     return { question, product, buyer };
   }
 
-  return { brandsOf, oilsForGuide, hasEngine, engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { DPF_Q, LOW_SAPS, brandsOf, oilsForGuide, hasEngine, engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -1532,7 +1544,14 @@ const Engine = (() => {
     let alt = null;
     const av = g && g.alt ? E.viscOf(g.alt)[0] : null;
     const motoMis = !!(prod && pv && veh && veh.model && (!!veh.moto !== /\b(4t|2t|moto)\b/i.test(prod.t)));
-    if ((gv && pv && pv !== gv && pv !== av) || motoMis) { alt = combo.oil; if (alt && E.keyOf(alt) === E.keyOf(prod)) alt = null; }
+    const dpfMis = !!(prod && pv && E.DPF_Q.test(E.norm(q)) && !E.LOW_SAPS.test(prod.t));
+    if ((gv && pv && pv !== gv && pv !== av) || motoMis || dpfMis) {
+      // La alternativa, en lo posible del mismo tamaño que la publicación (bidón de 4 → otro de 4)
+      const pl = E.litersOf(prod.t);
+      const cands = g ? E.oilsForGuide(catalog, g, q, 80).filter((it) => E.keyOf(it) !== E.keyOf(prod) && (!dpfMis || E.LOW_SAPS.test(it.t))) : [];
+      alt = (pl && cands.find((it) => Math.abs((E.litersOf(it.t) || 0) - pl) < 0.3)) || cands[0] || combo.oil;
+      if (alt && E.keyOf(alt) === E.keyOf(prod)) alt = null;
+    }
 
     // Lo que detecté
     const f = $("facts"); f.textContent = "";
@@ -1851,7 +1870,7 @@ const Engine = (() => {
   });
 
   // ---- Catálogo
-  const APP_VERSION = "20.2";
+  const APP_VERSION = "20.3";
   function saveCatalog() { store.set("catalog", catalog); $("catBadge").textContent = catalog.length + " productos · versión " + APP_VERSION; $("catCount").textContent = catalog.length + " productos"; }
   function renderCatList() {
     const box = $("catList"); box.textContent = "";
