@@ -11,6 +11,13 @@ App para responder rápido las preguntas de Mercado Libre de la tienda **grig** 
 - Busca en tu catálogo el aceite y los filtros indicados y arma la respuesta con el link de la publicación, sin precios.
 - Guarda las respuestas que copias y te sugiere las parecidas.
 
+## Filtros Fram
+
+1. La app detecta marca, modelo, motor y año. Si falta un dato, la respuesta se lo pide al cliente.
+2. Toca **Copiar vehículo** y **Abrir catálogo Fram**, y busca el filtro.
+3. Escribe el código (por ejemplo `PH5949`, o varios: `PH5949, CA11206`). La app lo busca en tus publicaciones y pone el link si lo tienes.
+4. Al copiar la respuesta, el código queda guardado para ese vehículo y año.
+
 ## Usarla en el iPhone
 
 Abre el link en Safari → botón Compartir → **Agregar a pantalla de inicio**.

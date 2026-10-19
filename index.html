@@ -126,6 +126,23 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
       <div class="plist" id="plist"></div>
     </div>
 
+    <div class="panel" id="framPanel" hidden>
+      <div class="row between">
+        <h2>Filtro Fram</h2>
+        <a class="btn" href="https://catalogofram.com.ar/inicio" target="_blank" rel="noopener">Abrir catálogo Fram</a>
+      </div>
+      <div class="row between">
+        <div class="facts" id="framVeh"></div>
+        <button class="btn" id="framCopyVeh" type="button">Copiar vehículo</button>
+      </div>
+      <div class="field">
+        <label for="framCode">Código Fram que encontraste</label>
+        <input type="text" id="framCode" placeholder="Ej: PH5949  ·  varios: PH5949, CA11206" autocapitalize="characters" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="facts" id="framResult"></div>
+      <p class="hint" id="framSaved"></p>
+    </div>
+
     <div class="panel">
       <div class="row between"><h2>Respuesta</h2><span class="count" id="count"></span></div>
       <textarea class="answer" id="answer" aria-label="Respuesta"></textarea>
@@ -568,7 +585,7 @@ const Engine = (() => {
   }
 
   function compose(ctx) {
-    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, settings: S, seed = 0, q = "" } = ctx;
+    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, fram = [], settings: S, seed = 0, q = "" } = ctx;
     const pick = (key, arr) => arr[(seed + hash(key)) % arr.length];
     const P = prod ? prodName(prod.t) : "";
     const isFilter = prod && /filtro/i.test(prod.t);
@@ -580,7 +597,7 @@ const Engine = (() => {
     const out = [];
     let asked = false;
     const askData = () => { if (asked) return ""; asked = true; return pick("ask", ["Para confirmarte, ¿nos indicás marca, modelo, año y motor de tu vehículo?", "Así te asesoramos bien, ¿nos pasás marca, modelo, año y motor del vehículo?"]); };
-    const wantsFilters = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia") || isFilter;
+    const wantsFilters = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
     const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo");
     const ambiguous = !guide && veh && veh.model && options.length > 1;
     const oilTalk = !isFilter || intents.has("litros") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
@@ -628,7 +645,7 @@ const Engine = (() => {
     }
 
     if (intents.has("stock") && wantsFilters && !isFilter) {
-      if (combo.filters.length) out.push("¡Sí, tenemos!");
+      if (fram.length ? fram.some((f) => f.it) : combo.filters.length) out.push("¡Sí, tenemos!");
     } else if (intents.has("stock")) {
       out.push(prod ? pick("stock", ["Sí, tenemos stock disponible del " + P + ".", "Sí, el " + P + " está disponible.", "¡Sí, hay stock disponible!"])
         : pick("stock0", ["Sí, tenemos stock disponible de lo publicado.", "Sí, contamos con disponibilidad. Podés comprar directamente desde la publicación."]));
@@ -640,7 +657,15 @@ const Engine = (() => {
       else { const a = askData(); if (a) out.push(a); }
     }
 
-    if (wantsFilters && veh && veh.model) {
+    if (fram.length) {
+      fram.forEach((f, i) => {
+        const head = i === 0 ? "Para " + (veh && veh.model ? "tu " + veh.label : "tu vehículo") + " el filtro" : "El filtro";
+        let t = head + (f.cat ? " de " + f.cat : "") + " que corresponde es el Fram " + f.code + ".";
+        if (f.it) { const l = lk(f.it); t += l ? " Podés agregarlo al carrito desde acá:" + l : " Lo tenemos disponible."; }
+        else t += " En este momento no lo tenemos disponible.";
+        out.push(t);
+      });
+    } else if (wantsFilters && veh && veh.model) {
       const fl = combo.filters;
       if (fl.length) out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
       else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
@@ -694,6 +719,23 @@ const Engine = (() => {
     return lines.slice(from, last + 1).join(" ");
   }
 
+  // ---- Códigos Fram: tipo de filtro por prefijo y búsqueda en las publicaciones
+  const collapse = (s) => norm(s).replace(/\b([a-z]{1,4})[\s-]+(?=\d)/g, "$1");
+  function parseCodes(s) {
+    return [...new Set(String(s).toUpperCase().split(/[,;\/\s]+(?=[A-Z])/).map((c) => c.replace(/[\s.-]/g, "")).filter((c) => /^[A-Z]{1,4}\d{2,6}[A-Z]{0,2}$/.test(c)))];
+  }
+  function framCat(code) {
+    if (/^(PHS?|CH|XG|TG|HP)\d/.test(code)) return "aceite";
+    if (/^CA\d/.test(code)) return "aire";
+    if (/^CF\d/.test(code)) return "habitáculo";
+    if (/^(G|GF|PS|P|PSC)\d/.test(code)) return "combustible";
+    return "";
+  }
+  function findByCode(catalog, code) {
+    const re = new RegExp("(^|[^a-z0-9])" + code.toLowerCase() + "([^a-z0-9]|$)");
+    return catalog.find((it) => re.test(collapse(it.t))) || null;
+  }
+
   // Captura de "Preguntas" del panel de vendedores: producto (fila del SKU) y pregunta (entre el nombre del comprador y "Respuestas rápidas")
   const ANCHOR = /respuestas? r[aá]pid|solo pod[eé]s enviar|no incluyas datos|escrib[ií]\s*\S?\s*para acceder/i;
   const PROD_ROW = /\bSKU\b|\d[\d.]*\s*unidades|\$\s?\d/i;
@@ -732,7 +774,7 @@ const Engine = (() => {
     return { question, product };
   }
 
-  return { parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -760,7 +802,9 @@ const Engine = (() => {
   let bank = store.get("bank", []);
   let settings = { ...DEFAULTS, ...store.get("settings", {}) };
 
-  let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0, listing: "", listingKey: null };
+  let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0, listing: "", listingKey: null, framVehKey: null };
+  let framMem = store.get("framMem", {});
+  const vehKey = (v) => v && v.model ? [v.brand, v.model, v.engine || ""].join("|") : null;
 
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 1800); }
 
@@ -790,6 +834,14 @@ const Engine = (() => {
 
   function analyze() {
     const q = $("q").value;
+    // Si cambió el vehículo, se limpia el código Fram (o se completa con uno guardado para ese vehículo y año)
+    const v = E.extractVehicle(q);
+    const k = vehKey(v);
+    if ((k || "") + "|" + (v && v.year || "") !== state.framVehKey) {
+      state.framVehKey = (k || "") + "|" + (v && v.year || "");
+      const mem = k && framMem[k];
+      $("framCode").value = mem && v.year && mem.byYear[v.year] ? mem.byYear[v.year] : "";
+    }
     state.intents = E.detectIntents(q);
     state.manual = null;
     state.seed = 0;
@@ -835,7 +887,37 @@ const Engine = (() => {
 
     renderProducts(q, prod);
     if (!q.trim()) { $("answer").value = ""; updateCount(); $("bankPanel").hidden = true; return; }
-    $("answer").value = E.compose({ intents, prod, veh, guide: g, options: m.options, alt, combo, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q });
+    // Filtro Fram
+    const codes = E.parseCodes($("framCode").value);
+    const fram = codes.map((code) => ({ code, cat: E.framCat(code), it: E.findByCode(catalog, code) }));
+    $("framPanel").hidden = !(q.trim() && (codes.length || intents.has("filtros") || intents.has("combo") || intents.has("equivalencia") || (prod && /filtro/i.test(prod.t))));
+    const fv = $("framVeh"); fv.textContent = "";
+    if (veh && veh.model) {
+      const b = document.createElement("b"); b.textContent = veh.label; fv.append(b);
+      const miss = [!veh.year && "año", !veh.engine && "motor"].filter(Boolean);
+      if (miss.length) { const w = document.createElement("div"); w.className = "warn"; w.textContent = "Falta " + miss.join(" y ") + ": la respuesta se lo pide al cliente."; fv.append(w); }
+    } else fv.textContent = "El cliente no dijo el vehículo.";
+    const fr = $("framResult"); fr.textContent = "";
+    fram.forEach((f) => {
+      const d = document.createElement("div");
+      const b = document.createElement("b"); b.textContent = f.code + (f.cat ? " (" + f.cat + ")" : "") + ": ";
+      d.append(b);
+      if (f.it) {
+        d.append(f.it.t + " ");
+        if (f.it.id) { const a = document.createElement("a"); a.href = E.linkOf(f.it); a.target = "_blank"; a.rel = "noopener"; a.textContent = "ver publicación"; d.append(a); }
+      } else { d.className = "warn"; d.append("no está en tu catálogo cargado. Si lo tienes publicado, carga esa página en Catálogo."); }
+      fr.append(d);
+    });
+    const mem = veh && framMem[vehKey(veh)];
+    $("framSaved").textContent = mem ? "Guardado antes para este vehículo: " + Object.entries(mem.byYear).map(([y, c]) => (y === "?" ? "sin año" : y) + " → " + c).join(" · ") : "";
+
+    // Si la pregunta nombra un tipo de filtro, la respuesta usa solo los códigos de ese tipo
+    const nq = E.norm(q);
+    const wanted = [/filtros? (de |del )?aceite/.test(nq) && "aceite", /filtros? (de |del )?aire(?! acond)/.test(nq) && "aire",
+      /(combustible|nafta|gasoil)/.test(nq) && /filtro/.test(nq) && "combustible", /(habitaculo|polen|cabina|aire acondicionado)/.test(nq) && "habitáculo"].filter(Boolean);
+    const framAns = wanted.length ? fram.filter((f) => !f.cat || wanted.includes(f.cat)) : fram;
+
+    $("answer").value = E.compose({ intents, prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q });
     updateCount();
     renderBank(q);
   }
@@ -889,7 +971,13 @@ const Engine = (() => {
   $("q").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(analyze, 180); });
   $("prodSearch").addEventListener("input", () => update());
   $("answer").addEventListener("input", updateCount);
-  $("clearQ").addEventListener("click", () => { $("q").value = ""; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
+  $("framCode").addEventListener("input", () => update());
+  $("framCopyVeh").addEventListener("click", async () => {
+    const v = E.extractVehicle($("q").value);
+    if (!v) { toast("No hay vehículo para copiar."); return; }
+    try { await navigator.clipboard.writeText(v.label); toast("Copiado: " + v.label); } catch { toast(v.label); }
+  });
+  $("clearQ").addEventListener("click", () => { $("q").value = ""; $("framCode").value = ""; state.framVehKey = null; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
   $("another").addEventListener("click", () => { state.seed++; update(); });
 
   async function copyText(text) {
@@ -904,6 +992,13 @@ const Engine = (() => {
     if (!a) { toast("No hay respuesta para copiar."); return; }
     const ok = await copyText(a);
     toast(ok ? "Copiada. Pégala en Mercado Libre." : "Seleccionada: toca Copiar en el menú.");
+    const v = E.extractVehicle(q), codes = E.parseCodes($("framCode").value);
+    if (v && v.model && codes.length) {
+      const k = vehKey(v);
+      framMem[k] = framMem[k] || { label: v.label, byYear: {} };
+      framMem[k].byYear[v.year || "?"] = codes.join(", ");
+      store.set("framMem", framMem);
+    }
     if (q) {
       bank = [{ q: q.slice(0, 600), a, t: Date.now() }, ...bank.filter((b) => !(b.q === q.slice(0, 600) && b.a === a))].slice(0, 400);
       store.set("bank", bank);
@@ -1048,7 +1143,7 @@ const Engine = (() => {
     catalog = []; saveCatalog(); renderCatList(); $("bkStatus").textContent = "Catálogo borrado.";
   });
   $("exportBtn").addEventListener("click", () => {
-    const data = JSON.stringify({ app: "respondedor-grig", v: 1, fecha: new Date().toISOString(), catalog, vehicles: guide, bank, settings }, null, 1);
+    const data = JSON.stringify({ app: "respondedor-grig", v: 1, fecha: new Date().toISOString(), catalog, vehicles: guide, bank, settings, framMem }, null, 1);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
     a.download = "respaldo-respondedor-" + new Date().toISOString().slice(0, 10) + ".json";
@@ -1066,6 +1161,7 @@ const Engine = (() => {
       if (Array.isArray(d.vehicles)) guide = d.vehicles;
       if (Array.isArray(d.bank)) bank = d.bank;
       if (d.settings) settings = { ...DEFAULTS, ...d.settings };
+      if (d.framMem) { framMem = d.framMem; store.set("framMem", framMem); }
       saveCatalog(); store.set("vehicles", guide); store.set("bank", bank); store.set("settings", settings);
       loadSettingsForm(); renderVehicles(); renderCatList(); analyze();
       $("bkStatus").textContent = "Respaldo cargado: " + catalog.length + " productos, " + guide.length + " vehículos, " + bank.length + " respuestas.";
