@@ -283,7 +283,8 @@ const Engine = (() => {
     { key: "postventa", label: "Post-venta", re: /(ya compr|realice (la )?compra|hice (la|una) compra|mi (pedido|compra|paquete|envio)|preparando tu envio|seguimiento|no me (llego|entregaron)|cuando (lo )?despach|ya pague|compre hace)/ },
     { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
     { key: "filtros", label: "Filtros", re: /filtro/ },
-    { key: "combo", label: "Combo / service", re: /(kit|combo|incluye|viene con|todo lo (que|necesario)|service|cambio de aceite y filtro)/ },
+    { key: "kit", label: "Kit de filtros", re: /(\bkit\b|juego de filtros|combo de filtros|todos los filtros|los 3 filtros|los tres filtros)/ },
+    { key: "combo", label: "Combo / service", re: /(combo|incluye|viene con|todo lo (que|necesario)|service|cambio de aceite y filtro)/ },
   ];
   function detectIntents(q) {
     const n = " " + norm(q) + " ";
@@ -638,7 +639,7 @@ const Engine = (() => {
   }
 
   function comboFor(catalog, veh, g, q) {
-    const res = { oil: null, filters: [] };
+    const res = { oil: null, filters: [], kits: [] };
     if (!veh || !veh.model) return res;
     const mt = veh.model.split(" ");
     const has = (n, t) => new RegExp("(^|[^a-z0-9])" + t.replace(/[.+]/g, "\\$&") + "([^a-z0-9]|$)").test(n);
@@ -656,6 +657,7 @@ const Engine = (() => {
     catalog.forEach((it) => {
       prep(it);
       if (!/filtro/.test(it._n) || !mt.every((t) => has(it._n, t)) || !filterFits(it, veh)) return;
+      if (/\bkit\b/.test(it._n)) { res.kits.push(it); return; }
       const c = filterCat(it._n);
       if (c) (byCat[c] = byCat[c] || []).push(it);
     });
@@ -685,7 +687,7 @@ const Engine = (() => {
     const out = [];
     let asked = false;
     const askData = () => { if (asked) return ""; asked = true; return pick("ask", ["Para confirmarte, ¿nos indicás marca, modelo, año y motor de tu vehículo?", "Así te asesoramos bien, ¿nos pasás marca, modelo, año y motor del vehículo?"]); };
-    const wantsFilters = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
+    const wantsFilters = intents.has("filtros") || intents.has("kit") || intents.has("combo") || intents.has("equivalencia") || isFilter || fram.length > 0;
     const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo");
     const ambiguous = !guide && veh && veh.model && options.length > 1;
     const oilTalk = !isFilter || intents.has("litros") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
@@ -789,6 +791,17 @@ const Engine = (() => {
         out.push(t);
       });
     } else if (wantsFilters && veh && veh.model) {
+      // Sin año o motor no se sabe qué filtro lleva: se pregunta antes de ofrecer nada
+      const missF = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+      if (missF) { out.length = 1; out.push("¿Me podrías indicar el " + missF + " de tu " + veh.label + "?"); return finish(); }
+      if (intents.has("kit")) {
+        out.length = 1;
+        const kit = (combo.kits || []).find((k) => !veh.engine || norm(k.t).includes(veh.engine)) || (combo.kits || [])[0];
+        if (kit) out.push("Para tu " + veh.label + " tenemos el " + prodName(kit.t) + "." + lk(kit));
+        else if (combo.filters.length) out.push("No tenemos el kit armado para tu " + veh.label + ", pero tenemos los filtros por separado: " + combo.filters.map((f) => "el de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+        else return noStock();
+        return finish();
+      }
       const fl = combo.filters;
       if (fl.length) out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
       else if (isFilter && !fram.length) out.push("Para tu " + veh.label + " tenemos el " + P + ".");
