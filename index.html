@@ -483,12 +483,12 @@ const Engine = (() => {
   }
 
   // ---- Redacción de la respuesta
-  const TU = [["podés", "puedes"], ["tenés", "tienes"], ["indicás", "indicas"], ["querés", "quieres"], ["pasás", "pasas"], ["necesitás", "necesitas"],
+  const TU = [["disculpá", "disculpa"], ["podés", "puedes"], ["tenés", "tienes"], ["indicás", "indicas"], ["querés", "quieres"], ["pasás", "pasas"], ["necesitás", "necesitas"],
     ["indicanos", "indícanos"], ["pasanos", "pásanos"], ["consultanos", "consúltanos"], ["avisanos", "avísanos"], ["cargá", "carga"], ["fijate", "fíjate"],
     ["elegí", "elige"], ["vas a necesitar", "necesitarás"], ["contás", "cuentas"], ["escribinos", "escríbenos"], ["sumá", "suma"]];
   // Trato de usted, como responde la tienda ("su vehículo", "me podría indicar")
   const USTED = [["vas a necesitar", "va a necesitar"], ["nos confirmás", "nos confirma"], ["nos decís", "nos dice"], ["nos pasás", "nos pasa"], ["nos indicás", "nos indica"],
-    ["podés", "puede"], ["tenés", "tiene"], ["indicás", "indica"], ["querés", "quiere"], ["pasás", "pasa"], ["necesitás", "necesita"], ["contás", "cuenta"],
+    ["disculpá", "disculpe"], ["podés", "puede"], ["tenés", "tiene"], ["indicás", "indica"], ["querés", "quiere"], ["pasás", "pasa"], ["necesitás", "necesita"], ["contás", "cuenta"],
     ["confirmás", "confirma"], ["decís", "dice"], ["indicanos", "indíquenos"], ["pasanos", "pásenos"], ["consultanos", "consúltenos"], ["avisanos", "avísenos"],
     ["escribinos", "escríbanos"], ["cargá", "cargue"], ["fijate", "fíjese"], ["elegí", "elija"], ["sumá", "sume"], ["podrías", "podría"],
     ["te asesoramos", "lo asesoramos"], ["indicarte", "indicarle"], ["confirmarte", "confirmarle"], ["asesorarte", "asesorarlo"], ["ayudarte", "ayudarlo"], ["te", "le"], ["tu", "su"], ["tus", "sus"]];
@@ -697,17 +697,20 @@ const Engine = (() => {
       return text;
     };
     const who = veh && veh.model ? "tu " + veh.label : "tu vehículo";
+    // Cuando no hay el producto, la tienda responde siempre lo mismo
+    const noStock = () => { out.length = 1; out.push("Disculpá pero no tenemos stock en estos momentos."); return finish(); };
     // Respuesta rápida elegida por el vendedor (como "Buenas, sí es apto para su vehículo. Saludos")
     if (verdict === "apto") { out.push("Sí, es apto para " + who + "."); return finish(); }
     if (verdict === "noapto") { out.push("No es apto para " + who + "." + (combo.oil ? " Te recomendamos el " + prodName(combo.oil.t) + "." + lk(combo.oil) : "")); return finish(); }
     if (verdict === "si") { out.push("Sí."); return finish(); }
     if (verdict === "no") { out.push("No."); return finish(); }
-    if (verdict === "notenemos") { out.push("No tenemos."); return finish(); }
+    if (verdict === "notenemos") return noStock();
     // Marca que la tienda no trabaja (ej. "¿venden Mopar 5-30?")
-    if (noBrand) { out.push("No tenemos " + noBrand.name + "." + (noBrand.alt ? " Te ofrecemos el " + prodName(noBrand.alt.t) + ", que es " + fmtVisc(viscOf(noBrand.alt.t)[0]) + "." + lk(noBrand.alt) : "")); return finish(); }
+    if (noBrand) return noStock();
     // Mismo producto en otro tamaño (ej. "¿lo tenés en 1 litro?")
     if (variant) {
-      out.push(variant.it ? "Te paso el link." + (lk(variant.it) || " " + prodName(variant.it.t) + ".") : "Por el momento no tenemos esa presentación.");
+      if (!variant.it) return noStock();
+      out.push("Te paso el link." + (lk(variant.it) || " " + prodName(variant.it.t) + "."));
       return finish();
     }
     // Pregunta técnica: viscosidad del producto o su ficha guardada
@@ -771,8 +774,9 @@ const Engine = (() => {
       else { const a = askData(); if (a) out.push(a); }
     }
 
+    if (fram.length && !fram.some((f) => f.it)) return noStock();
     if (fram.length) {
-      fram.forEach((f, i) => {
+      fram.filter((f) => f.it).forEach((f, i) => {
         const head = i === 0 && veh && veh.model ? "Para tu " + veh.label + " el filtro" : "El filtro";
         let t = head + (f.cat ? " de " + f.cat : "") + " que corresponde es el Fram " + f.code + ".";
         if (f.it) { const l = lk(f.it); t += l ? " Podés agregarlo al carrito desde acá:" + l : " Lo tenemos disponible."; }
@@ -788,8 +792,8 @@ const Engine = (() => {
         asked = true;
         const miss = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
         // Con todos los datos y sin filtro en el catálogo: se avisa que no hay stock
-        out.push(!miss ? "En este momento no contamos con stock del filtro para tu " + veh.label + "."
-          : "¿Me podrías indicar el " + miss + " de tu " + veh.label + "?");
+        if (!miss) return noStock();
+        out.push("¿Me podrías indicar el " + miss + " de tu " + veh.label + "?");
       }
       if (prod && !isFilter && !vehTalk && pv && gv && pv === gv) out.push("Además, el " + P + " es " + fmtVisc(pv) + ", ideal para tu " + veh.label + "." + lk(prod));
     } else if (intents.has("equivalencia") || (intents.has("filtros") && !isFilter)) {
