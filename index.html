@@ -800,6 +800,11 @@ const Engine = (() => {
       return finish();
     }
     if (intents.has("postventa") && S.postventa) { out.push(S.postventa); return finish(); }
+    // Si el cliente pide algo para su vehículo y falta el año o el motor, primero se pregunta (sin pasar links)
+    if (veh && veh.model && !fram.length && !ambiguous && (wantsFilters || vehTalk)) {
+      const falta = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+      if (falta) { out.push("¿Me podrías indicar el " + falta + " de tu " + veh.label + "?"); return finish(); }
+    }
 
     if (vehTalk && guide && veh) {
       const parts = [];
