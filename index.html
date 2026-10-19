@@ -601,6 +601,18 @@ const Engine = (() => {
     if (/(combustible|nafta|gasoil)/.test(n)) return "combustible";
     return null;
   }
+  // Un filtro le sirve al vehículo si su título nombra el modelo y no contradice el motor ni los años
+  function filterFits(it, veh) {
+    if (!veh || !veh.model) return true;
+    const n = norm(it.t), words = n.split(/[^a-z0-9.]+/);
+    if (!veh.model.split(" ").every((t) => words.includes(t))) return false;
+    const engs = (n.match(/\b\d[.,]\d\b/g) || []).map((e) => e.replace(",", "."));
+    if (veh.engine && engs.length && !engs.includes(veh.engine)) return false;
+    const yr = n.match(/\b((?:19|20)\d\d)\s*(?:a|al|-|hasta)\s*((?:19|20)\d\d)\b/);
+    if (veh.year && yr && (Number(veh.year) < Number(yr[1]) || Number(veh.year) > Number(yr[2]))) return false;
+    return true;
+  }
+
   function comboFor(catalog, veh, g, q) {
     const res = { oil: null, filters: [] };
     if (!veh || !veh.model) return res;
@@ -619,7 +631,7 @@ const Engine = (() => {
     const byCat = {};
     catalog.forEach((it) => {
       prep(it);
-      if (!/filtro/.test(it._n) || !mt.every((t) => has(it._n, t))) return;
+      if (!/filtro/.test(it._n) || !mt.every((t) => has(it._n, t)) || !filterFits(it, veh)) return;
       const c = filterCat(it._n);
       if (c) (byCat[c] = byCat[c] || []).push(it);
     });
@@ -716,11 +728,13 @@ const Engine = (() => {
     } else if (wantsFilters && veh && veh.model) {
       const fl = combo.filters;
       if (fl.length) out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+      else if (isFilter && !fram.length) out.push("Para tu " + veh.label + " tenemos el " + P + ".");
       else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
       else if (!isFilter && !asked) {
         asked = true;
-        const miss = [!veh.year && "año", !veh.engine && "motor"].filter(Boolean).join(" y ");
-        out.push(!miss ? "Si nos pasás el código del filtro que tiene colocado tu " + veh.label + ", te confirmamos cuál de nuestros filtros le corresponde."
+        const miss = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
+        // Con todos los datos y sin filtro en el catálogo: se avisa que no hay stock
+        out.push(!miss ? "En este momento no contamos con stock del filtro para tu " + veh.label + "."
           : "Para indicarte el filtro exacto de tu " + veh.label + ", ¿nos pasás " + miss + ", o el código del filtro que tiene colocado?");
       }
       if (prod && !isFilter && !vehTalk && pv && gv && pv === gv) out.push("Además, el " + P + " es " + fmtVisc(pv) + ", ideal para tu " + veh.label + "." + lk(prod));
@@ -822,7 +836,7 @@ const Engine = (() => {
     return { question, product };
   }
 
-  return { parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -902,7 +916,7 @@ const Engine = (() => {
     if (!state.prodManual) {
       // Un filtro solo se elige solo si su título nombra el vehículo de la pregunta
       const v2 = E.extractVehicle(q);
-      const fits = (it) => !/filtro/i.test(it.t) || !(v2 && v2.model) || v2.model.split(" ").every((t) => E.norm(it.t).split(/[^a-z0-9.]+/).includes(t));
+      const fits = (it) => !/filtro/i.test(it.t) || E.filterFits(it, v2);
       const top = E.scoreItems(catalog, q).find((x) => fits(x.it));
       state.prodKey = top && top.s >= 3.5 ? E.keyOf(top.it) : state.listingKey;
     }
@@ -937,6 +951,9 @@ const Engine = (() => {
         const parts = [combo.oil && "aceite: " + E.prodName(combo.oil.t), ...combo.filters.map((x) => "filtro de " + x.cat + ": " + E.prodName(x.it.t))].filter(Boolean);
         fact("Combo en tu catálogo", parts.length ? parts.join(" · ") : "no encontré productos que nombren este vehículo", parts.length ? "" : "warn");
       }
+      const filterQ = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia");
+      if (filterQ && veh && veh.model && veh.year && (veh.engine || /\d+cc/.test(veh.label)) && !combo.filters.length && !E.parseCodes($("framCode").value).length && !(prod && /filtro/i.test(prod.t)))
+        fact("Ojo", "no encontré filtros para este vehículo en tu catálogo, así que la respuesta dice que no hay stock. Si lo tienes, escribe el código Fram.", "warn");
       const vs = E.viscOf(q); if (vs.length) fact("Viscosidad", vs.map((v) => v.toUpperCase().replace("W", "W-")).join(", "));
       if (!intents.size) fact("Tema", "no lo detecté, elige uno abajo", "warn");
       if (alt && prod) fact("Ojo", "el producto elegido es " + pv.toUpperCase() + " y la guía indica " + g.visc, "warn");
