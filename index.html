@@ -226,8 +226,6 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
           <select id="sTrato"><option value="vos">Vos (Argentina)</option><option value="tu">Tú</option></select></div>
         <div class="field"><label for="sLink">Link en la respuesta</label>
           <select id="sLink"><option value="1">Sí, incluir link</option><option value="0">No incluir</option></select></div>
-        <div class="field"><label for="sMaxOils">Aceites a ofrecer por respuesta</label>
-          <select id="sMaxOils"><option value="3">Hasta 3</option><option value="5">Hasta 5</option><option value="8">Hasta 8</option><option value="99">Todos los que entren</option></select></div>
       </div>
       <div class="field"><label for="sDespedida">Despedida</label><input type="text" id="sDespedida"></div>
     </div>
@@ -559,7 +557,7 @@ const Engine = (() => {
     return null;
   }
   function comboFor(catalog, veh, g, q) {
-    const res = { oil: null, oils: [], filters: [] };
+    const res = { oil: null, filters: [] };
     if (!veh || !veh.model) return res;
     const mt = veh.model.split(" ");
     const has = (n, t) => new RegExp("(^|[^a-z0-9])" + t.replace(/[.+]/g, "\\$&") + "([^a-z0-9]|$)").test(n);
@@ -567,17 +565,11 @@ const Engine = (() => {
     if (gv) {
       const need = g.litros ? parseFloat(String(g.litros).replace(",", ".")) : 4;
       const qt = tokens(q).filter((t) => t.length > 3);
-      // Solo aceites de motor de auto: se excluyen moto, náutico, transmisión, frenos y aditivos
-      const NOT_ENGINE = /filtro|\b(2t|4t|moto|motos|nautic\w*|outboard|marine|kart|atf|cvt|transmision|trasmision|gear|caja|hidraulic\w*|direccion|dexron|mercon|frenos?|aditivo|limpia\w*|refrigerante|chain|cadena|cuatriciclos?)\b/;
-      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !NOT_ENGINE.test(it._n); });
+      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !/filtro|\b(2t|4t|moto)\b/.test(it._n); });
       // La norma del fabricante (ej. VW 507.00) en el título pesa más que el tamaño del envase
       const normaT = g.norma ? tokens(g.norma).filter((t) => /\d/.test(t) && t.length >= 3) : [];
       const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0) + (normaT.some((t) => it._n.includes(t)) ? 4 : 0); };
-      res.oils = oils.sort((a, b) => sc(b) - sc(a));
-      // La viscosidad alternativa de la guía (ej. "también 10W-40") también sirve: va después
-      const av = g.alt ? viscOf(g.alt)[0] : null;
-      if (av && av !== gv) res.oils.push(...catalog.filter((it) => hasVisc(it._n, av) && !NOT_ENGINE.test(it._n)).sort((a, b) => sc(b) - sc(a)));
-      res.oil = res.oils[0] || null;
+      res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
     }
     const byCat = {};
     catalog.forEach((it) => {
@@ -596,13 +588,7 @@ const Engine = (() => {
   }
 
   function compose(ctx) {
-    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, oils: [], filters: [] }, fram = [], settings: S, seed = 0, q = "", maxOils = 5 } = ctx;
-    // Lista de aceites que sirven, cada uno con su link: "el X link; el Y link y el Z link"
-    const oilList = (list) => {
-      const parts = list.slice(0, maxOils).map((it) => "el " + prodName(it.t) + lk(it));
-      return parts.length > 1 ? parts.slice(0, -1).join("; ") + " y " + parts[parts.length - 1] : parts[0] || "";
-    };
-    const goodOils = (combo.oils || []).filter((it) => !prod || keyOf(it) !== keyOf(prod));
+    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, fram = [], settings: S, seed = 0, q = "" } = ctx;
     const pick = (key, arr) => arr[(seed + hash(key)) % arr.length];
     const P = prod ? prodName(prod.t) : "";
     const isFilter = prod && /filtro/i.test(prod.t);
@@ -629,11 +615,9 @@ const Engine = (() => {
       if (parts.length) out.push("Para tu " + veh.label + " " + parts.join(" y ") + ".");
       if (prod && pv && gv) {
         if (pv === gv) out.push(pick("ok", ["El " + P + " cumple con esa viscosidad, así que es el indicado.", "El " + P + " es " + fmtVisc(pv) + ", así que te va perfecto."]));
-        else out.push("El " + P + " es " + fmtVisc(pv) + ", por eso te recomendamos un " + fmtVisc(gv) + (goodOils.length ? ". De nuestra tienda te sirven " + oilList(goodOils) + "." : "."));
+        else out.push("El " + P + " es " + fmtVisc(pv) + ", por eso te recomendamos un " + fmtVisc(gv) + (alt ? ": el " + prodName(alt.t) + " es ideal." : "."));
       } else if ((!prod || isFilter) && oilTalk && combo.oil) {
-        const n = Math.min(goodOils.length, maxOils);
-        out.push(n > 1 ? pick("oilrec", ["De nuestra tienda te sirven " + oilList(goodOils) + ".", "Tenemos estas opciones para tu auto: " + oilList(goodOils) + "."])
-          : "De nuestra tienda te recomendamos " + oilList(goodOils) + ".");
+        out.push(pick("oilrec", ["De nuestra tienda te recomendamos el " + prodName(combo.oil.t) + ".", "El ideal de nuestra tienda es el " + prodName(combo.oil.t) + "."]) + lk(combo.oil));
       }
       if (guide.nota) out.push("Dato útil: " + guide.nota + ".");
       if (guide.pre && parts.length) out.push("Igualmente te recomendamos confirmarlo en el manual del vehículo.");
@@ -710,7 +694,7 @@ const Engine = (() => {
     if (intents.has("devolucion") && S.devolucion) out.push(S.devolucion);
     if (intents.has("combo")) out.push("Podés sumar el aceite y los filtros al carrito y comprarlos juntos.");
 
-    const linkProd = pv && gv && pv !== gv ? null : (wantsFilters && !isFilter && !vehTalk ? null : prod);
+    const linkProd = alt && pv && gv && pv !== gv ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
     const l = lk(linkProd);
     if (l) out.push(pick("link", ["Podés agregarlo al carrito desde acá:", "Te dejo el link para que lo agregues al carrito:"]) + l);
 
@@ -807,7 +791,7 @@ const Engine = (() => {
     set(k, v) { try { localStorage.setItem("grig." + k, JSON.stringify(v)); return true; } catch { toast("No se pudo guardar en este navegador."); return false; } },
   };
   const DEFAULTS = {
-    trato: "vos", link: "1", maxOils: "5",
+    trato: "vos", link: "1",
     despedida: "¡Quedamos a disposición! Saludos, equipo grig.",
     envio: "Hacemos envíos a todo el país por Mercado Envíos. En la publicación podés ver cuándo te llega según tu código postal; en muchas zonas llega en el día.",
     factura: "Sí, emitimos factura. Una vez hecha la compra, cargá tus datos de facturación en Mercado Libre.",
@@ -905,7 +889,7 @@ const Engine = (() => {
         if (g) fact("Guía", E.vehName(g) + (g.y1 ? " (" + g.y1 + "-" + g.y2 + ")" : "") + " · " + [g.visc + (g.alt ? " / " + g.alt : ""), g.litros && g.litros + " L", g.norma, g.fa].filter(Boolean).join(" · ") + (g.pre ? " · orientativo" : ""));
         else if (m.options.length > 1) fact("Según motor", m.options.slice(0, 4).map((v) => v.motor + " " + v.y1 + "-" + v.y2 + ": " + v.visc).join(" | "), "warn");
         else fact("Guía", "este vehículo no está en la guía (cárgalo en Vehículos)", "warn");
-        const parts = [combo.oils.length && (combo.oils.length === 1 ? "aceite: " + E.prodName(combo.oil.t) : combo.oils.length + " aceites que sirven (" + combo.oils.slice(0, 3).map((x) => E.prodName(x.t)).join(", ") + (combo.oils.length > 3 ? "…" : "") + ")"), ...combo.filters.map((x) => "filtro de " + x.cat + ": " + E.prodName(x.it.t))].filter(Boolean);
+        const parts = [combo.oil && "aceite: " + E.prodName(combo.oil.t), ...combo.filters.map((x) => "filtro de " + x.cat + ": " + E.prodName(x.it.t))].filter(Boolean);
         fact("Combo en tu catálogo", parts.length ? parts.join(" · ") : "no encontré productos que nombren este vehículo", parts.length ? "" : "warn");
       }
       const vs = E.viscOf(q); if (vs.length) fact("Viscosidad", vs.map((v) => v.toUpperCase().replace("W", "W-")).join(", "));
@@ -945,10 +929,7 @@ const Engine = (() => {
       /(combustible|nafta|gasoil)/.test(nq) && /filtro/.test(nq) && "combustible", /(habitaculo|polen|cabina|aire acondicionado)/.test(nq) && "habitáculo"].filter(Boolean);
     const framAns = wanted.length ? fram.filter((f) => !f.cat || wanted.includes(f.cat)) : fram;
 
-    const ctx = { intents, prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q };
-    let maxOils = Number(settings.maxOils) || 5, ans = E.compose({ ...ctx, maxOils });
-    while (ans.length > 2000 && maxOils > 1) ans = E.compose({ ...ctx, maxOils: --maxOils });
-    $("answer").value = ans;
+    $("answer").value = E.compose({ intents, prod, veh, guide: g, options: m.options, alt, combo, fram: framAns, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q });
     updateCount();
     renderBank(q);
   }
@@ -1258,7 +1239,7 @@ const Engine = (() => {
   });
 
   // ---- Ajustes
-  const SET_FIELDS = { sTrato: "trato", sLink: "link", sMaxOils: "maxOils", sDespedida: "despedida", sEnvio: "envio", sFactura: "factura", sPago: "pago", sOriginal: "original", sDevolucion: "devolucion" };
+  const SET_FIELDS = { sTrato: "trato", sLink: "link", sDespedida: "despedida", sEnvio: "envio", sFactura: "factura", sPago: "pago", sOriginal: "original", sDevolucion: "devolucion" };
   function loadSettingsForm() { Object.entries(SET_FIELDS).forEach(([id, k]) => ($(id).value = settings[k] ?? "")); }
   Object.entries(SET_FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { settings[k] = $(id).value; store.set("settings", settings); update(); }));
   $("resetSettings").addEventListener("click", () => { settings = { ...DEFAULTS, trato: settings.trato, link: settings.link }; store.set("settings", settings); loadSettingsForm(); update(); toast("Textos restablecidos."); });
