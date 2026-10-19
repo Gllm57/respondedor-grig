@@ -243,7 +243,7 @@ const Engine = (() => {
   const INTENTS = [
     { key: "compat", label: "Compatibilidad", re: /(sirve|sirven|le va|va (para|bien|en)|compatib|corresponde|es para|anda (para|en|bien)|puedo (usar|poner|ponerle)|lo uso|le pongo|para mi |motor \d|que lleva|lleva (mi|el))/ },
     { key: "litros", label: "Litros", re: /(cuant[oa]s? (litros|bidones|botellas|lleva)|cuanto aceite|capacidad|alcanza|cantidad de aceite|me alcanza|necesito \d+ ?(l|lts|litros))/ },
-    { key: "stock", label: "Stock", re: /(stock|disponib|\btenes\b|\btienen\b|\btenga[ns]?\b|\bhay\b|queda|entrega inmediata|lo tenes|lo tienen|siguen? (teniendo|vendiendo))/ },
+    { key: "stock", label: "Stock", re: /(stock|disponib|\btenes\b|\btienen\b|tendr[aá][sn]?\b|tendrian|\btenga[ns]?\b|\bhay\b|queda|entrega inmediata|lo tenes|lo tienen|siguen? (teniendo|vendiendo))/ },
     { key: "recomendar", label: "Recomendación", re: /(recomend|aconsej|cual (me )?(conviene|es mejor|uso|usar|lleva)|que aceite|diferencia|mejor opcion|cual es el mejor|sintetico o|semi ?sintetico o|mineral o)/ },
     { key: "precio", label: "Precio", re: /(precio|cuanto (sale|cuesta|esta|vale)|descuento|por mayor|mayorista|si llevo|varias|\d+ unidades|oferta|rebaja|mejor precio|cantidad)/ },
     { key: "pago", label: "Pagos", re: /(cuotas|tarjeta|efectivo|transferencia|mercado ?pago|forma de pago|medios de pago)/ },
@@ -344,6 +344,7 @@ const Engine = (() => {
       let s = 0;
       for (const t of toks) if (viscs.has(t) ? hasVisc(it._n, t) : it._n.includes(t)) s += viscs.has(t) ? 5 : t.length > 3 ? 2 : 1;
       if (viscs.size && ![...viscs].some((v) => hasVisc(it._n, v))) s -= 3;
+      if (s > 0) s -= 0.05 * tokens(it.t).filter((t) => !toks.includes(t)).length;
       return { it, s };
     }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
   }
@@ -626,7 +627,9 @@ const Engine = (() => {
       }
     }
 
-    if (intents.has("stock")) {
+    if (intents.has("stock") && wantsFilters && !isFilter) {
+      if (combo.filters.length) out.push("¡Sí, tenemos!");
+    } else if (intents.has("stock")) {
       out.push(prod ? pick("stock", ["Sí, tenemos stock disponible del " + P + ".", "Sí, el " + P + " está disponible.", "¡Sí, hay stock disponible!"])
         : pick("stock0", ["Sí, tenemos stock disponible de lo publicado.", "Sí, contamos con disponibilidad. Podés comprar directamente desde la publicación."]));
     }
@@ -643,9 +646,11 @@ const Engine = (() => {
       else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
       else if (!isFilter && !asked) {
         asked = true;
-        out.push(veh.year && veh.engine ? "Si nos pasás el código del filtro que tiene colocado tu " + veh.label + ", te confirmamos cuál de nuestros filtros le corresponde."
-          : "Para indicarte el filtro exacto de tu " + veh.label + ", ¿nos pasás año y motor, o el código del filtro que tiene colocado?");
+        const miss = [!veh.year && "año", !veh.engine && "motor"].filter(Boolean).join(" y ");
+        out.push(!miss ? "Si nos pasás el código del filtro que tiene colocado tu " + veh.label + ", te confirmamos cuál de nuestros filtros le corresponde."
+          : "Para indicarte el filtro exacto de tu " + veh.label + ", ¿nos pasás " + miss + ", o el código del filtro que tiene colocado?");
       }
+      if (prod && !isFilter && !vehTalk && pv && gv && pv === gv) out.push("Además, el " + P + " es " + fmtVisc(pv) + ", ideal para tu " + veh.label + "." + lk(prod));
     } else if (intents.has("equivalencia") || (intents.has("filtros") && !isFilter)) {
       if (!asked) out.push("Si nos pasás el código de tu filtro actual, o marca, modelo, año y motor del vehículo, te confirmamos el equivalente.");
     }
@@ -661,7 +666,7 @@ const Engine = (() => {
     if (intents.has("devolucion") && S.devolucion) out.push(S.devolucion);
     if (intents.has("combo")) out.push("Podés sumar el aceite y los filtros al carrito y comprarlos juntos.");
 
-    const linkProd = alt && pv && gv && pv !== gv ? alt : prod;
+    const linkProd = alt && pv && gv && pv !== gv ? alt : (wantsFilters && !isFilter && !vehTalk ? null : prod);
     const l = lk(linkProd);
     if (l) out.push(pick("link", ["Podés agregarlo al carrito desde acá:", "Te dejo el link para que lo agregues al carrito:"]) + l);
 
@@ -689,7 +694,45 @@ const Engine = (() => {
     return lines.slice(from, last + 1).join(" ");
   }
 
-  return { norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  // Captura de "Preguntas" del panel de vendedores: producto (fila del SKU) y pregunta (entre el nombre del comprador y "Respuestas rápidas")
+  const ANCHOR = /respuestas? r[aá]pid|solo pod[eé]s enviar|no incluyas datos|escrib[ií]\s*\S?\s*para acceder/i;
+  const PROD_ROW = /\bSKU\b|\d[\d.]*\s*unidades|\$\s?\d/i;
+  const BUYER = /\(\s*\w{0,3}\d{8,}|\(DS/i;
+  function cleanProduct(s) {
+    return String(s).replace(/.*\bSKU\s*\S+\s*/i, "").replace(/\d[\d.]*\s*unidades.*$/i, "").replace(/\$\s?\d.*$/, "")
+      .replace(/env[ií]o gratis.*$/i, "").replace(/^(cat[aá]logo\s*)/i, "").replace(/^[^A-Za-zÁÉÍÓÚÑ0-9]+/, "").replace(/^\S{1,2}\s+(?=[A-ZÁÉÍÓÚ])/, "").trim();
+  }
+  function cleanQuestion(s) {
+    return String(s).replace(/^(\S{1,2}\s+)*[*•·]\s+/, "").replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ¿¡]+/, "")
+      .replace(/\s+\S{0,5}\s*\d{1,3}\s*(m\S{0,2}nut\S*|hora\S*|d[ií]a\S*|seg\S*|mes\S*)(\s.*)?$/i, "")
+      .replace(/\s*apur\S*\s+a\s+respond.*$/i, "").replace(/\s+/g, " ").trim();
+  }
+  function parseScreenshot(lines) {
+    const L = lines.map((l) => String(l).replace(/\s+/g, " ").trim()).filter(Boolean);
+    let product = "";
+    const si = L.findIndex((l) => /\bSKU\b/i.test(l));
+    if (si >= 0) {
+      const same = cleanProduct(L[si]);
+      product = same.length >= 8 ? same : cleanProduct(L[si + 1] || "");
+    } else {
+      const pi = L.findIndex((l) => /\d[\d.]*\s*unidades|\$\s?\d/.test(l));
+      if (pi >= 0) product = cleanProduct(L[pi]);
+    }
+    const ai = L.findIndex((l) => ANCHOR.test(l));
+    let question = "";
+    if (ai > 0) {
+      let start = 0;
+      for (let i = ai - 1; i >= 0; i--) if (BUYER.test(L[i]) || PROD_ROW.test(L[i])) { start = i + 1; break; }
+      question = L.slice(start, ai).map(cleanQuestion).filter((l) => l.length > 3).join(" ");
+    }
+    if (!question) {
+      const hi = L.findIndex((l) => /hace\s+\d+\s*(minutos?|horas?|d[ií]as?)|apur[aá]te/i.test(l));
+      question = hi >= 0 ? cleanQuestion(L[hi]) : cleanQuestion(extractQuestion(L.join("\n")));
+    }
+    return { question, product };
+  }
+
+  return { parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -717,7 +760,7 @@ const Engine = (() => {
   let bank = store.get("bank", []);
   let settings = { ...DEFAULTS, ...store.get("settings", {}) };
 
-  let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0 };
+  let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0, listing: "", listingKey: null };
 
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 1800); }
 
@@ -752,7 +795,7 @@ const Engine = (() => {
     state.seed = 0;
     if (!state.prodManual) {
       const top = E.scoreItems(catalog, q)[0];
-      state.prodKey = top && top.s >= 5 ? E.keyOf(top.it) : null;
+      state.prodKey = top && top.s >= 4.5 ? E.keyOf(top.it) : state.listingKey;
     }
     update(true);
   }
@@ -776,6 +819,7 @@ const Engine = (() => {
     const fact = (label, val, cls) => { const d = document.createElement("div"); if (cls) d.className = cls; const b = document.createElement("b"); b.textContent = label + ": "; d.append(b, val); f.append(d); };
     if (!q.trim()) fact("Esperando", "pega una pregunta arriba");
     else {
+      if (state.listing) fact("Publicación", state.listing + (state.listingKey ? "" : " (no está en tu catálogo)"), state.listingKey ? "" : "warn");
       fact("Vehículo", veh ? veh.label : "no mencionado");
       if (veh && veh.model) {
         if (g) fact("Guía", E.vehName(g) + (g.y1 ? " (" + g.y1 + "-" + g.y2 + ")" : "") + " · " + [g.visc + (g.alt ? " / " + g.alt : ""), g.litros && g.litros + " L", g.norma, g.fa].filter(Boolean).join(" · ") + (g.pre ? " · orientativo" : ""));
@@ -845,7 +889,7 @@ const Engine = (() => {
   $("q").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(analyze, 180); });
   $("prodSearch").addEventListener("input", () => update());
   $("answer").addEventListener("input", updateCount);
-  $("clearQ").addEventListener("click", () => { $("q").value = ""; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
+  $("clearQ").addEventListener("click", () => { $("q").value = ""; state.listing = ""; state.listingKey = null; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
   $("another").addEventListener("click", () => { state.seed++; update(); });
 
   async function copyText(text) {
@@ -869,19 +913,75 @@ const Engine = (() => {
   // ---- Leer captura (OCR en el teléfono; descarga el lector la primera vez)
   let ocrWorker = null;
   function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("load")); document.head.append(s); }); }
+  function drawScaled(img, scale, crop) {
+    const r = crop || { x: 0, y: 0, w: img.width, h: img.height };
+    const c = document.createElement("canvas");
+    c.width = Math.round(r.w * scale); c.height = Math.round(r.h * scale);
+    const x = c.getContext("2d");
+    x.imageSmoothingQuality = "high";
+    x.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+    return c;
+  }
+  // Busca la tarjeta de la pregunta (desde la fila del producto hasta "Respuestas rápidas")
+  function findCard(lines, W, H) {
+    const ai = lines.findIndex((l) => E.ANCHOR.test(l.t));
+    let hi = ai;
+    if (hi < 0) hi = lines.findIndex((l) => /hace\s+\d+\s*(minutos?|horas?|d[ií]as?)|apur[aá]te|\?/i.test(l.t));
+    if (hi < 0) return null;
+    let top = Math.max(0, lines[hi].y0 - H * 0.12);
+    for (let i = hi - 1; i >= 0 && lines[hi].y0 - lines[i].y0 < H * 0.25; i--) if (E.PROD_ROW.test(lines[i].t)) { top = Math.max(0, lines[i].y0 - 12); break; }
+    const bottom = Math.min(H, lines[hi].y1 + (ai >= 0 ? 8 : H * 0.03));
+    return { x: 0, y: Math.floor(top), w: W, h: Math.ceil(bottom - top) };
+  }
   async function runOcr(file) {
     const st = $("ocrStatus");
     st.className = "status"; st.textContent = "Preparando el lector de capturas… (la primera vez tarda un poco)";
     try {
       if (!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
-      if (!ocrWorker) ocrWorker = await Tesseract.createWorker("spa", 1, { logger: (m) => { if (m.status === "recognizing text") st.textContent = "Leyendo la captura… " + Math.round(m.progress * 100) + "%"; } });
-      st.textContent = "Leyendo la captura…";
-      const { data } = await ocrWorker.recognize(file);
-      const question = E.extractQuestion(data.text);
+      let phase = "";
+      if (!ocrWorker) ocrWorker = await Tesseract.createWorker("spa", 1, { logger: (m) => { if (m.status === "recognizing text") st.textContent = phase + " " + Math.round(m.progress * 100) + "%"; } });
+      const img = await createImageBitmap(file);
+      const W = img.width, H = img.height;
+      // 1) Lectura general, agrandada para que la letra chica se lea
+      phase = "Buscando la pregunta…";
+      const s1 = Math.min(4, Math.max(1, 2400 / W));
+      const r1 = await ocrWorker.recognize(drawScaled(img, s1));
+      const lines1 = r1.data.lines.map((l) => ({ t: l.text.trim(), y0: l.bbox.y0 / s1, y1: l.bbox.y1 / s1 }));
+      let lines = lines1.map((l) => l.t);
+      const rows = lines.filter((l) => E.PROD_ROW.test(l));
+      // 2) Relectura de la tarjeta de la pregunta, más grande
+      const card = findCard(lines1, W, H);
+      if (card && card.h > 10) {
+        phase = "Leyendo la pregunta…";
+        const s2 = Math.min(5, Math.max(1.5, 3000 / card.w));
+        const r2 = await ocrWorker.recognize(drawScaled(img, s2, card));
+        const lines2 = r2.data.lines.map((l) => l.text.trim());
+        rows.push(...lines2.filter((l) => E.PROD_ROW.test(l)));
+        if (lines2.some((l) => E.ANCHOR.test(l)) || !lines.some((l) => E.ANCHOR.test(l))) lines = lines2;
+      }
+      const { question, product } = E.parseScreenshot(lines);
       $("q").value = question;
-      const top = E.scoreItems(catalog, data.text)[0];
-      if (top && top.s >= 6) { state.prodKey = E.keyOf(top.it); state.prodManual = true; } else state.prodManual = false;
-      st.textContent = "Listo. Revisa que la pregunta se haya leído bien y corrígela si hace falta.";
+      // La fila del producto suele leerse con errores: se prueba cada lectura contra el catálogo y gana la mejor
+      let best = null;
+      [product, ...rows.map(E.cleanProduct)].filter(Boolean).forEach((txt) => {
+        const t = E.scoreItems(catalog, txt)[0];
+        if (t && (!best || t.s > best.s)) best = t;
+      });
+      state.listingKey = best && best.s >= 4 ? E.keyOf(best.it) : null;
+      // "Preguntas en esta publicación #1179007927" trae el código exacto de la publicación
+      let idText = lines1.map((l) => l.t).join(" ");
+      const bc = lines1.find((l) => /(pregunt|aci[oó]n|esta)/i.test(l.t) && /\d{8,}/.test(l.t));
+      if (bc) {
+        phase = "Leyendo el número de publicación…";
+        const r3 = await ocrWorker.recognize(drawScaled(img, Math.min(5, 3600 / W), { x: 0, y: Math.max(0, Math.floor(bc.y0 - 4)), w: W, h: Math.ceil(bc.y1 - bc.y0 + 8) }));
+        idText = r3.data.text + " " + idText;
+      }
+      const idm = idText.match(/(?:esta|ci[oó]n)\D{0,20}?(\d{9,12})/i) || idText.match(/#\s*(\d{9,12})/);
+      const byId = idm && catalog.find((it) => it.id === "MLA" + idm[1] || it.id === "MLA" + idm[1].slice(1));
+      if (byId) { state.listingKey = E.keyOf(byId); best = { it: byId }; }
+      state.listing = state.listingKey ? best.it.t : product;
+      state.prodManual = false;
+      st.textContent = question ? "Listo. Revisa que la pregunta se haya leído bien y corrígela si hace falta." : "No encontré la pregunta en la captura. Pégala a mano.";
       analyze();
     } catch (e) {
       st.className = "status err";
