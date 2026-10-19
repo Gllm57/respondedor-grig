@@ -307,14 +307,17 @@ const Engine = (() => {
   ];
   function detectIntents(q) {
     const n = " " + norm(q) + " ";
-    return new Set(INTENTS.filter((i) => i.re.test(n)).map((i) => i.key));
+    const set = new Set(INTENTS.filter((i) => i.re.test(n)).map((i) => i.key));
+    // "tienen aceite para una Hilux": pide el aceite de un vehículo, se responde con el indicado (no con un "sí, hay stock")
+    if (/\baceites?\b/.test(n.replace(/filtros? (de |del |para )?aceite/g, "")) && !set.has("litros") && !set.has("ficha") && (extractVehicle(q) || {}).model) set.add("recomendar");
+    return set;
   }
 
   // ---- Vehículos
   // ---- Marcas y modelos que se reconocen en la pregunta (autos, utilitarios, camiones y motos del mercado argentino)
   const BRANDS = { volkswagen: ["vw", "volkswagen", "volks", "wolkswagen", "volkswaguen", "volkwagen"], chevrolet: ["chevrolet", "chevrolett", "chevrolete", "chevy"],
     ford: ["ford"], fiat: ["fiat"], renault: ["renault", "renol", "reno"], peugeot: ["peugeot", "peugot", "pegeot", "peugeut"], citroen: ["citroen", "citroen"],
-    toyota: ["toyota"], honda: ["honda"], nissan: ["nissan", "nisan"], hyundai: ["hyundai", "hiunday", "hyunday"], kia: ["kia"], jeep: ["jeep"], ram: ["ram"],
+    toyota: ["toyota", "toyoya", "toyta", "tayota", "toyot"], honda: ["honda"], nissan: ["nissan", "nisan"], hyundai: ["hyundai", "hiunday", "hyunday"], kia: ["kia"], jeep: ["jeep"], ram: ["ram"],
     "mercedes-benz": ["mercedes", "benz", "mb"], bmw: ["bmw"], audi: ["audi"], suzuki: ["suzuki"], mitsubishi: ["mitsubishi", "mitsubichi"], chery: ["chery"],
     dodge: ["dodge"], iveco: ["iveco"], subaru: ["subaru"], volvo: ["volvo"], mini: ["mini"], alfa: ["alfa"], ds: ["ds"], geely: ["geely"], byd: ["byd"],
     jac: ["jac"], haval: ["haval"], greatwall: ["greatwall"], dfsk: ["dfsk"], baic: ["baic"], lifan: ["lifan"], scania: ["scania"], agrale: ["agrale"],
@@ -712,7 +715,10 @@ const Engine = (() => {
       const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !/filtro|\b(2t|4t|moto)\b/.test(it._n); });
       // La norma del fabricante (ej. VW 507.00) en el título pesa más que el tamaño del envase
       const normaT = g.norma ? tokens(g.norma).filter((t) => /\d/.test(t) && t.length >= 3) : [];
-      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0) + (normaT.some((t) => it._n.includes(t)) ? 4 : 0); };
+      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0) + (normaT.some((t) => it._n.includes(t)) ? 4 : 0) + fuelSc(it._n); };
+      // Diésel: mejor un aceite apto diésel; nafta: no ofrecer uno de flota/camión
+      const dsl = /diesel/.test(g.comb || ""), DSL = /diesel|fleet|turbo ?d|\b(ck|ci|cj|cf)-?4?\b|505|507|\bc[234]\b|tdi|hdi/, NFT = /\bgdi\b|nafta|gasolin/;
+      function fuelSc(n) { return dsl ? (DSL.test(n) ? 3 : 0) - (NFT.test(n) ? 5 : 0) : (/fleet|camion/.test(n) ? -3 : 0); }
       res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
     }
     const byCat = {};
@@ -836,7 +842,7 @@ const Engine = (() => {
 
     if (intents.has("stock") && wantsFilters && !isFilter) {
       if (fram.length ? fram.some((f) => f.it) : combo.filters.length) out.push("Sí, tenemos.");
-    } else if (intents.has("stock")) {
+    } else if (intents.has("stock") && !(vehTalk && veh && veh.model && (guide || ambiguous))) {
       out.push(prod ? pick("stock", ["Sí, tenemos stock disponible del " + P + ".", "Sí, el " + P + " está disponible.", "Sí, hay stock disponible."])
         : pick("stock0", ["Sí, tenemos stock disponible de lo publicado.", "Sí, contamos con disponibilidad. Podés comprar directamente desde la publicación."]));
     }
@@ -1093,7 +1099,8 @@ const Engine = (() => {
       const nqf = E.norm(q);
       const wantCat = /filtros? (de |del )?aceite/.test(nqf) ? "aceite" : /filtros? (de |del )?aire(?! acond)/.test(nqf) ? "aire"
         : /filtros? (de |del )?(combustible|nafta|gasoil)/.test(nqf) ? "combustible" : /filtros? (de |del )?(habitaculo|polen|cabina)/.test(nqf) ? "habitáculo" : null;
-      const fits = (it) => !/filtro/i.test(it.t) || (E.filterFits(it, v2) && (!wantCat || /kit/i.test(it.t) || E.filterCat(E.norm(it.t)) === wantCat));
+      const onlyOil = /\baceites?\b/.test(nqf) && !/filtro|\bkit\b|combo|service/.test(nqf);
+      const fits = (it) => onlyOil ? !/filtro|\bkit\b/i.test(it.t) : !/filtro/i.test(it.t) || (E.filterFits(it, v2) && (!wantCat || /kit/i.test(it.t) || E.filterCat(E.norm(it.t)) === wantCat));
       // Si el cliente nombra una marca, primero los productos de esa marca
       const nqb = E.norm(q);
       const br = OIL_BRANDS.find(([k]) => new RegExp("\\b" + k + "\\b").test(nqb));
