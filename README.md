@@ -2,7 +2,7 @@
 
 App para responder rápido las preguntas de Mercado Libre de la tienda **grig** (aceites, refrigerantes y filtros). Funciona sin IA y sin VPN.
 
-**Abrir la app:** https://gllm57.github.io/respondedor-grig/
+**👉 Abrir la app: [gllm57.github.io/respondedor-grig](https://gllm57.github.io/respondedor-grig/)**
 
 ## Qué hace
 
