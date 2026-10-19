@@ -78,6 +78,12 @@ textarea { resize: vertical; }
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: .9rem; z-index: 5; }
 .vrow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; }
 .vrow:first-child { border-top: 0; }
+.vcard { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.vcard:first-child { border-top: 0; }
+.vcard h3 { margin: 0; font-family: var(--display); font-size: 1.15rem; }
+.vcard .sec { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 4px; }
+.vcard .ln { font-size: .88rem; overflow-wrap: anywhere; }
+.vcard .code { font-family: var(--mono); font-weight: 600; color: var(--accent); }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
@@ -95,6 +101,7 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
     <button role="tab" data-tab="resp" aria-selected="true">Responder</button>
     <button role="tab" data-tab="cat" aria-selected="false">Catálogo</button>
     <button role="tab" data-tab="veh" aria-selected="false">Vehículos</button>
+    <button role="tab" data-tab="pl" aria-selected="false">Plantillas</button>
     <button role="tab" data-tab="aj" aria-selected="false">Ajustes</button>
   </nav>
 
@@ -223,6 +230,16 @@ details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
       <p class="hint">Datos orientativos de viscosidad, litros y norma para los autos más comunes en Argentina. La respuesta siempre le sugiere al cliente confirmar en el manual. Si corriges uno con «Editar» y lo guardas, tu versión pasa a tener prioridad.</p>
       <input type="search" id="vPreSearch" placeholder="Buscar: 208, Gol Trend, Hilux…" aria-label="Buscar vehículo precargado">
       <div id="vPreList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== PLANTILLAS ===================== -->
+  <section data-pane="pl" class="pane" hidden style="display:grid;gap:14px">
+    <div class="panel">
+      <div class="row between"><h2>Plantillas por vehículo</h2><span class="count" id="plCount"></span></div>
+      <p class="hint">Se arman solas con tus publicaciones: cada vehículo con los filtros (y su código Fram) y kits que lo nombran, el aceite de la guía y los códigos que guardaste al responder. Se actualizan cuando cargás más publicaciones.</p>
+      <input type="search" id="plSearch" placeholder="Buscar: Gol Trend, Hilux, 208, PH5548…" aria-label="Buscar plantilla">
+      <div id="plList"></div>
     </div>
   </section>
 
@@ -638,6 +655,48 @@ const Engine = (() => {
     return true;
   }
 
+  // Código Fram en el título: "Ph5548a", "Ch 9973", "Ca11222", "Fram C 11812", "P4105", "Ph5566/2"
+  function framCodeOf(t) {
+    const n = norm(t);
+    const m = n.match(/\b(ph|ch|ca|cf|xg|tg)\s?-?\s?(\d{2,6})(\/\d|[a-z](?![a-z]))?/) || (/fram/.test(n) && n.match(/\b(g|p|c|cs|ps)\s?-?\s?(\d{3,6})(\/\d|[a-z](?![a-z]))?/));
+    return m ? (m[1] + m[2] + (m[3] || "")).toUpperCase() : null;
+  }
+  // Vehículos que nombra el título de una publicación (ej. "Gol Trend Fox Suran" -> 3 vehículos)
+  function vehiclesInTitle(t) {
+    const toks = norm(t).replace(/\bt-cross\b/g, "tcross").split(/[^a-z0-9.]+/).filter(Boolean);
+    const brands = new Set(toks.map((x) => Object.keys(BRANDS).find((b) => BRANDS[b].includes(x))).filter(Boolean));
+    const out = new Map();
+    toks.forEach((x, i) => (MODELS[x] || []).forEach((m) => {
+      if (m.needBrand && !brands.has(m.brand)) return;
+      if (brands.size && !brands.has(m.brand) && (MODELS[x] || []).some((o) => brands.has(o.brand))) return;
+      if (/^(19|20)\d\d$/.test(x)) return;
+      let model = x;
+      if (MULTI.has(x + " " + (toks[i + 1] || ""))) model = x + " " + toks[i + 1];
+      out.set(m.brand + "|" + model, { brand: m.brand, model });
+    }));
+    return [...out.values()];
+  }
+  function engineVariants(veh) {
+    if (!veh || !veh.model) return 0;
+    return new Set(VEHICLES.filter((v) => v.brand === veh.brand && v.modelos.some((m) => norm(m) === veh.model)).map((v) => v.motor.split(" ")[0])).size;
+  }
+  // Plantilla por vehículo: todos los filtros y kits de la tienda que lo nombran
+  function buildIndex(catalog) {
+    const idx = new Map();
+    catalog.forEach((it) => {
+      prep(it);
+      if (!/filtro/.test(it._n)) return;
+      const kind = /\bkit\b/.test(it._n) ? "kit" : filterCat(it._n) || "otro";
+      const code = framCodeOf(it.t);
+      vehiclesInTitle(it.t).forEach((v) => {
+        const k = v.brand + "|" + v.model;
+        if (!idx.has(k)) idx.set(k, { ...v, label: (BRAND_NAME[v.brand] || v.brand) + " " + v.model.replace(/\b[a-z]/g, (c) => c.toUpperCase()), items: [] });
+        idx.get(k).items.push({ it, kind, code });
+      });
+    });
+    return [...idx.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }
+
   function comboFor(catalog, veh, g, q) {
     const res = { oil: null, filters: [], kits: [] };
     if (!veh || !veh.model) return res;
@@ -665,9 +724,13 @@ const Engine = (() => {
     const nq = norm(q);
     const wanted = [/filtros? (de |del )?aceite/.test(nq) && "aceite", /filtros? (de |del )?aire(?! acond)/.test(nq) && "aire",
       /filtros? (de |del )?(combustible|nafta|gasoil)/.test(nq) && "combustible", /filtros? (de |del )?(habitaculo|polen|cabina|aire acondicionado)/.test(nq) && "habitáculo"].filter(Boolean);
+    const uniq = (list) => [...new Map(list.map((x) => [framCodeOf(x.t) || keyOf(x), x])).values()];
+    res.kits = uniq(res.kits);
+    res.ambiguous = false;
     ["aceite", "aire", "combustible", "habitáculo"].filter((c) => !wanted.length || wanted.includes(c)).forEach((c) => {
-      const list = byCat[c];
+      const list = byCat[c] ? uniq(byCat[c]) : null;
       if (!list) return;
+      if (list.length > 1) res.ambiguous = true;
       const it = (veh.engine && list.find((x) => x._n.includes(veh.engine))) || list[0];
       res.filters.push({ cat: c, it });
     });
@@ -792,16 +855,22 @@ const Engine = (() => {
       });
     } else if (wantsFilters && veh && veh.model) {
       // Sin año o motor no se sabe qué filtro lleva: se pregunta antes de ofrecer nada
+      // Solo se pregunta año/motor si hay más de una opción posible (o ninguna y faltan datos)
       const missF = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
-      if (missF) { out.length = 1; out.push("¿Me podrías indicar el " + missF + " de tu " + veh.label + "?"); return finish(); }
+      const askMiss = () => { out.length = 1; out.push("¿Me podrías indicar el " + missF + " de tu " + veh.label + "?"); return finish(); };
+      const kits = combo.kits || [];
       if (intents.has("kit")) {
+        const needEngineK = !(veh.engine || /\d+cc/.test(veh.label)) && engineVariants(veh) > 1;
+        if (missF && (kits.length > 1 || needEngineK || (!kits.length && (combo.ambiguous || !combo.filters.length)))) return askMiss();
         out.length = 1;
-        const kit = (combo.kits || []).find((k) => !veh.engine || norm(k.t).includes(veh.engine)) || (combo.kits || [])[0];
+        const kit = kits.find((k) => !veh.engine || norm(k.t).includes(veh.engine)) || kits[0];
         if (kit) out.push("Para tu " + veh.label + " tenemos el " + prodName(kit.t) + "." + lk(kit));
         else if (combo.filters.length) out.push("No tenemos el kit armado para tu " + veh.label + ", pero tenemos los filtros por separado: " + combo.filters.map((f) => "el de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
         else return noStock();
         return finish();
       }
+      const needEngine = !(veh.engine || /\d+cc/.test(veh.label)) && engineVariants(veh) > 1;
+      if (missF && (combo.ambiguous || needEngine || (!combo.filters.length && !isFilter))) return askMiss();
       const fl = combo.filters;
       if (fl.length) {
         out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
@@ -914,7 +983,7 @@ const Engine = (() => {
     return { question, product };
   }
 
-  return { filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+  return { engineVariants, framCodeOf, vehiclesInTitle, buildIndex, filterCat, toUsted, filterFits, parseCodes, framCat, findByCode, parseScreenshot, cleanProduct, ANCHOR, PROD_ROW, norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
 })();
 </script>
 
@@ -980,6 +1049,7 @@ const Engine = (() => {
     document.querySelectorAll("nav.tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
     document.querySelectorAll(".pane").forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab));
     if (b.dataset.tab === "cat") renderCatList();
+    if (b.dataset.tab === "pl") renderPlantillas();
   }));
 
   // ---- Responder
@@ -1440,6 +1510,42 @@ const Engine = (() => {
     else if (!s && list.length > 12) box.insertAdjacentHTML("beforeend", '<p class="hint">Mostrando 12 de ' + list.length + '. Usa el buscador para ver el resto.</p>');
   }
   $("vPreSearch").addEventListener("input", renderPre);
+
+  // ---- Plantillas: filtros y aceite por vehículo
+  const KIND = { aceite: "Filtro de aceite", aire: "Filtro de aire", combustible: "Filtro de combustible", "habitáculo": "Filtro de habitáculo", kit: "Kit", otro: "Otros filtros" };
+  function renderPlantillas() {
+    const idx = E.buildIndex(catalog);
+    const qq = E.norm($("plSearch").value.trim());
+    const list = idx.filter((v) => !qq || E.norm(v.label).includes(qq) || v.items.some((x) => (x.code || "").toLowerCase().includes(qq.replace(/\s/g, ""))));
+    $("plCount").textContent = idx.length + " vehículos";
+    const box = $("plList"); box.textContent = "";
+    if (!list.length) { box.innerHTML = '<p class="hint">No hay plantillas que coincidan. Cargá más publicaciones de filtros en Catálogo.</p>'; return; }
+    list.slice(0, qq ? 60 : 25).forEach((v) => {
+      const c = document.createElement("div"); c.className = "vcard";
+      const h = document.createElement("h3"); h.textContent = v.label; c.append(h);
+      const addSec = (t) => { const d = document.createElement("div"); d.className = "sec"; d.textContent = t; c.append(d); };
+      const addLine = (code, text, it) => {
+        const d = document.createElement("div"); d.className = "ln";
+        if (code) { const b = document.createElement("span"); b.className = "code"; b.textContent = code + " "; d.append(b); }
+        d.append(text + " ");
+        if (it && it.id) { const a = document.createElement("a"); a.href = E.linkOf(it); a.target = "_blank"; a.rel = "noopener"; a.textContent = "ver publicación"; d.append(a); }
+        c.append(d);
+      };
+      const g = E.VEHICLES.filter((x) => x.brand === v.brand && x.modelos.some((m) => E.norm(m) === v.model));
+      if (g.length) { addSec("Aceite (guía orientativa)"); g.forEach((x) => addLine("", x.motor + " (" + x.y1 + "-" + x.y2 + "): " + x.visc + (x.alt ? " / " + x.alt : "") + (x.litros ? " · " + x.litros + " L" : "") + (x.norma ? " · " + x.norma : ""))); }
+      Object.keys(KIND).forEach((k) => {
+        const its = v.items.filter((x) => x.kind === k);
+        if (!its.length) return;
+        addSec(KIND[k]);
+        its.forEach((x) => addLine(x.code, x.it.t, x.it));
+      });
+      const mem = Object.entries(framMem).filter(([k]) => k.startsWith(v.brand + "|" + v.model + "|"));
+      if (mem.length) { addSec("Códigos que guardaste"); mem.forEach(([, m]) => addLine("", m.label + ": " + Object.entries(m.byYear).map(([y, cds]) => (y === "?" ? "sin año" : y) + " → " + cds).join(" · "))); }
+      box.append(c);
+    });
+    if (!qq && list.length > 25) box.insertAdjacentHTML("beforeend", '<p class="hint">Mostrando 25 de ' + list.length + '. Usá el buscador para ver el resto.</p>');
+  }
+  $("plSearch").addEventListener("input", renderPlantillas);
 
   $("vSave").addEventListener("click", () => {
     const veh = $("vName").value.trim();
