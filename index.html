@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Respondedor">
+<meta name="theme-color" content="#c27a00">
+<title>Respondedor grig</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Una columna de trabajo: pregunta -> lo que detectó -> respuesta; pestañas para catálogo, vehículos y ajustes */
+:root {
+  --bg: #eef0f2; --surface: #ffffff; --ink: #1b2229; --muted: #5d6873; --line: #d5dade;
+  --accent: #c27a00; --accent-ink: #ffffff; --accent-soft: #fbefd9; --coolant: #0f8a7e; --warn: #b5481f;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161a; --surface: #1b2127; --ink: #e8ecef; --muted: #9aa5af; --line: #2d353d;
+    --accent: #f0a429; --accent-ink: #1a1204; --accent-soft: #33270f; --coolant: #3cc2b3; --warn: #f07a4f;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+[hidden] { display: none !important; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: max(14px, env(safe-area-inset-top)) 48px; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); display: grid; gap: 14px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.9rem; line-height: 1; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--display); font-size: 1.05rem; letter-spacing: .08em; text-transform: uppercase; margin: 0; color: var(--muted); }
+nav.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 4px; overflow-x: auto; }
+nav.tabs button { flex: 1 1 auto; font: inherit; font-weight: 600; font-size: .88rem; background: none; border: 0; color: var(--muted); padding: 8px 6px; border-radius: 7px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+label { font-size: .85rem; font-weight: 600; }
+.field { display: grid; gap: 4px; min-width: 0; flex: 1 1 200px; }
+input[type=text], input[type=search], textarea, select { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; width: 100%; }
+textarea { resize: vertical; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hint { font-size: .8rem; color: var(--muted); margin: 0; }
+.btn { font: inherit; font-size: .9rem; font-weight: 500; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.main { font-family: var(--display); font-weight: 700; font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; background: var(--accent); color: var(--accent-ink); border: 0; padding: 11px 18px; }
+.btn.link { border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font: inherit; font-size: .85rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 5px 11px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.facts { display: grid; gap: 4px; font-size: .88rem; }
+.facts b { font-weight: 600; }
+.facts .warn { color: var(--warn); }
+.plist { display: grid; }
+.pitem { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; cursor: pointer; }
+.pitem:first-child { border-top: 0; }
+.pitem input { margin-top: 3px; }
+.pitem .t { min-width: 0; overflow-wrap: anywhere; }
+.pitem .p { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.pitem .p s { display: block; color: var(--muted); font-size: .75rem; }
+.id { font-family: var(--mono); font-size: .72rem; color: var(--muted); }
+.answer { min-height: 230px; font-size: 1rem; line-height: 1.55; }
+.count { font-family: var(--mono); font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.count.over { color: var(--warn); }
+.status { font-size: .85rem; color: var(--muted); }
+.status.err { color: var(--warn); }
+.bank { display: grid; gap: 0; }
+.bitem { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.bitem:first-child { border-top: 0; padding-top: 0; }
+.bitem .q { font-size: .82rem; color: var(--muted); }
+.bitem .a { font-size: .9rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 8px; font-size: .9rem; z-index: 5; }
+.vrow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; }
+.vrow:first-child { border-top: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+details summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+details[open] > .sub { display: grid; gap: 10px; margin-top: 10px; }
+@media (prefers-reduced-motion: no-preference) { .chip, .btn { transition: background .12s, border-color .12s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Respondedor <span>grig</span></h1>
+    <span class="hint" id="catBadge"></span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="resp" aria-selected="true">Responder</button>
+    <button role="tab" data-tab="cat" aria-selected="false">Catálogo</button>
+    <button role="tab" data-tab="veh" aria-selected="false">Vehículos</button>
+    <button role="tab" data-tab="aj" aria-selected="false">Ajustes</button>
+  </nav>
+
+  <!-- ===================== RESPONDER ===================== -->
+  <section data-pane="resp" class="pane" style="display:grid;gap:14px">
+    <div class="panel">
+      <div class="row between">
+        <h2>Pregunta del cliente</h2>
+        <div class="row">
+          <button class="btn" id="ocrBtn" type="button">Leer captura</button>
+          <button class="btn" id="clearQ" type="button">Limpiar</button>
+        </div>
+      </div>
+      <input type="file" id="ocrFile" accept="image/*" hidden>
+      <textarea id="q" rows="3" placeholder="Pega aquí la pregunta. Ej: Hola, ¿el 5w30 le sirve a mi Peugeot 208 1.6 2019? ¿Tienen stock?"></textarea>
+      <div class="status" id="ocrStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Lo que detecté</h2>
+      <div class="facts" id="facts"></div>
+      <div class="chips" id="intents" aria-label="Temas de la respuesta"></div>
+      <p class="hint">Toca un tema para agregarlo o quitarlo de la respuesta.</p>
+    </div>
+
+    <div class="panel">
+      <div class="row between"><h2>Producto</h2><span class="hint" id="prodHint"></span></div>
+      <input type="search" id="prodSearch" placeholder="Buscar otro producto: Motul 5w30, Valvoline…" aria-label="Buscar producto">
+      <div class="plist" id="plist"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row between"><h2>Respuesta</h2><span class="count" id="count"></span></div>
+      <textarea class="answer" id="answer" aria-label="Respuesta"></textarea>
+      <div class="row between">
+        <button class="btn" id="another" type="button">Otra versión</button>
+        <button class="btn main" id="copy" type="button">Copiar respuesta</button>
+      </div>
+    </div>
+
+    <div class="panel" id="bankPanel" hidden>
+      <h2>Respuestas parecidas que ya diste</h2>
+      <div class="bank" id="bank"></div>
+    </div>
+  </section>
+
+  <!-- ===================== CATÁLOGO ===================== -->
+  <section data-pane="cat" class="pane" hidden style="display:grid;gap:14px">
+    <div class="panel">
+      <div class="row between"><h2>Catálogo</h2><span class="count" id="catCount"></span></div>
+      <input type="search" id="catSearch" placeholder="Buscar: 5w30, Motul, filtro…" aria-label="Buscar en el catálogo">
+      <div class="plist" id="catList"></div>
+    </div>
+    <div class="panel">
+      <h2>Agregar productos</h2>
+      <ol class="hint" style="margin:0;padding-left:18px">
+        <li>Abre una página de tus publicaciones en Mercado Libre.</li>
+        <li>Selecciona todo y cópialo (en iPhone: mantén presionado → Seleccionar todo → Copiar).</li>
+        <li>Pégalo aquí y toca «Agregar». Repite con cada página.</li>
+      </ol>
+      <p class="hint">También puedes pegar filas copiadas del Excel del catálogo.</p>
+      <textarea id="catPaste" rows="5" placeholder="Pega aquí el texto de una página de publicaciones"></textarea>
+      <div class="row"><button class="btn" id="catAdd" type="button">Agregar</button><span class="status" id="catStatus"></span></div>
+    </div>
+    <div class="panel">
+      <h2>Respaldo</h2>
+      <p class="hint">Todo se guarda en este navegador. Para pasarlo a otro teléfono o computadora, descarga el respaldo y cárgalo allá.</p>
+      <div class="row">
+        <button class="btn" id="exportBtn" type="button">Descargar respaldo</button>
+        <button class="btn" id="importBtn" type="button">Cargar respaldo</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+        <button class="btn link" id="catClear" type="button">Borrar catálogo</button>
+      </div>
+      <div class="status" id="bkStatus"></div>
+    </div>
+  </section>
+
+  <!-- ===================== VEHÍCULOS ===================== -->
+  <section data-pane="veh" class="pane" hidden style="display:grid;gap:14px">
+    <div class="panel">
+      <h2>Guía de vehículos</h2>
+      <p class="hint">Agrega o corrige vehículos. Tus datos tienen prioridad sobre los precargados. Si cargas el código de filtro, la respuesta lo menciona.</p>
+      <div class="grid2">
+        <div class="field"><label for="vName">Vehículo</label><input type="text" id="vName" placeholder="Peugeot 208 1.6"></div>
+        <div class="field"><label for="vVisc">Viscosidad</label><input type="text" id="vVisc" placeholder="5W-30"></div>
+        <div class="field"><label for="vLit">Litros con filtro</label><input type="text" id="vLit" placeholder="4,25"></div>
+        <div class="field"><label for="vFa">Filtro de aceite</label><input type="text" id="vFa" placeholder="Fram PH5949"></div>
+        <div class="field"><label for="vFai">Filtro de aire</label><input type="text" id="vFai" placeholder="Fram CA11206"></div>
+        <div class="field"><label for="vNota">Nota (opcional)</label><input type="text" id="vNota" placeholder="Norma PSA B71 2290"></div>
+      </div>
+      <div class="row"><button class="btn" id="vSave" type="button">Guardar vehículo</button><span class="status" id="vStatus"></span></div>
+      <p class="hint">Escribe solo marca, modelo y motor (sin el año). Revisa los datos en el manual del vehículo antes de cargarlos.</p>
+    </div>
+    <div class="panel">
+      <div class="row between"><h2>Tus vehículos</h2><span class="count" id="vCount"></span></div>
+      <div id="vList"></div>
+    </div>
+    <div class="panel">
+      <div class="row between"><h2>Precargados</h2><span class="count" id="vPreCount"></span></div>
+      <p class="hint">Datos orientativos de viscosidad, litros y norma para los autos más comunes en Argentina. La respuesta siempre le sugiere al cliente confirmar en el manual. Si corriges uno con «Editar» y lo guardas, tu versión pasa a tener prioridad.</p>
+      <input type="search" id="vPreSearch" placeholder="Buscar: 208, Gol Trend, Hilux…" aria-label="Buscar vehículo precargado">
+      <div id="vPreList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== AJUSTES ===================== -->
+  <section data-pane="aj" class="pane" hidden style="display:grid;gap:14px">
+    <div class="panel">
+      <h2>Cómo respondes</h2>
+      <div class="grid2">
+        <div class="field"><label for="sTrato">Trato</label>
+          <select id="sTrato"><option value="vos">Vos (Argentina)</option><option value="tu">Tú</option></select></div>
+        <div class="field"><label for="sLink">Link en la respuesta</label>
+          <select id="sLink"><option value="1">Sí, incluir link</option><option value="0">No incluir</option></select></div>
+      </div>
+      <div class="field"><label for="sDespedida">Despedida</label><input type="text" id="sDespedida"></div>
+    </div>
+    <div class="panel">
+      <h2>Textos de la tienda</h2>
+      <p class="hint">Se usan cuando el cliente pregunta por estos temas. Revísalos y ajústalos a cómo trabaja la tienda.</p>
+      <div class="field"><label for="sEnvio">Envíos</label><textarea id="sEnvio" rows="2"></textarea></div>
+      <div class="field"><label for="sFactura">Factura</label><textarea id="sFactura" rows="2"></textarea></div>
+      <div class="field"><label for="sPago">Pagos y cuotas</label><textarea id="sPago" rows="2"></textarea></div>
+      <div class="field"><label for="sOriginal">Originalidad y vencimiento</label><textarea id="sOriginal" rows="2"></textarea></div>
+      <div class="field"><label for="sDevolucion">Cambios y devoluciones</label><textarea id="sDevolucion" rows="2"></textarea></div>
+      <button class="btn link" id="resetSettings" type="button">Volver a los textos originales</button>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ==================== MOTOR (sin IA) ==================== */
+const CATALOGO_INICIAL = [{"id":"MLA3385659242","t":"Motul 5100 4T 15w-50 1 L","p":24605,"a":25900},{"id":"MLA1369327201","t":"Aceite Motul 8100 Xcess gen2 5w40 X5l","p":98000},{"id":"MLA1381171208","t":"Aceite TotalEnergies Quartz 7000 10w-40 API SN x 4L","p":63175,"a":66500},{"id":"MLA1610196800","t":"Motul 8100 5/30 Eco-nergy X 5lts","p":99000},{"id":"MLA1640762480","t":"Aceite Semisintético Petronas Selenia K 15w40 Sn 4 Litros","p":61900},{"id":"MLA1190014696","t":"Aceite para motor Valvoline semi-sintético 10W-40 para auto/camioneta de 1 unidad x 3.8L","p":52500},{"id":"MLA1309804673","t":"Totalenergies Quartz 9000 5w-40 X4 Litros","p":135000},{"id":"MLA1384273847","t":"Elf Evolution 700 10w40 X4lts","p":68000},{"id":"MLA1179007927","t":"Aceite Motul 8100 Xcess 5w40 X5l","p":98000},{"id":"MLA1300057319","t":"Aceite Valvoline Advance 5W-30 100% Sintetico","p":138613},{"id":"MLA1986273864","t":"Aceite Gulf 5w30 Sintetico Ultrasynth Gdi X 4 Litros","p":69900},{"id":"MLA3535014406","t":"Aceite Mineral Max 20w-50 Gulf Oil","p":32990},{"id":"MLA2157507727","t":"Bidon de 4l Aceite Semi-Sintetico 10w-40 Motorcraft","p":47499,"a":49999},{"id":"MLA1986309958","t":"Aceite Mannol extreme 5W-40 sintético para auto/camioneta x 5LTS","p":95250},{"id":"MLA1986273634","t":"Aceite para motor Gulf semi-sintético 10W-40 para autos, pickups & suv x4lt","p":48990},{"id":"MLA3278200000","t":"Valvoline Aceite Premium Protection 15w40 3,78l Bidón","p":45000},{"id":"MLA1309798442","t":"Aceite Totalenergies Quartz Ineo Mc3 5w-30 x 4L","p":142955},{"id":"MLA1453224738","t":"Aceite Motul 7100 10w40 Sintético 4 Tiempos 1 Litro","p":41583},{"id":"MLA3017574252","t":"Motul 3000 20W-50 1L Mineral 4T","p":14900},{"id":"MLA4075560710","t":"Aceite Semisintetico 10w40 Motorcraft 2 Bidones X4lts","p":95000},{"id":"MLA2442666324","t":"Aceite Mannol 10w60 Racing 4lts + Ester Sintetico Aleman","p":113500},{"id":"MLA1468466963","t":"Aceite De Motor 8100 X-cess 5w40 Botella De 5 Litros Motul","p":98500},{"id":"MLA1916549748","t":"Aceite Petronas Selenia K Pure Energy Fe 5w30 4lts Sintetico puro","p":99750,"a":105000},{"id":"MLA1495592789","t":"Valvoline Synpower 75w90 X946ml 100% Sintético","p":66500},{"id":"MLA1535203923","t":"STP Tuff Stuff - Limpiador en Espuma Multiuso 623 g - Limpia Tapicería Tela Alfombra y Vinilo - Removedor de Manchas para Auto y Hogar en Aerosol","p":14900},{"id":"MLA1737806456","t":"Aceite Motul 8100 Eco-lite 5w30 X5lt","p":105450},{"id":"MLA1610598172","t":"Aceite Quartz 7000 10w40 Semisintetico Nafta Y Diesel Total","p":66500},{"id":"MLA1986296810","t":"Aceite Mannol Energy 5w30 5lts Sintetico Acea A3 / B4","p":95500},{"id":"MLA2000105508","t":"Aceite Mannol classic 10W-40 semisintetico x 5lts","p":70900},{"id":"MLA1438770510","t":"Aceite Sintético Petronas Selenia K Forward 0w20 Fiat Cronos","p":114000,"a":120000},{"id":"MLA3964237090","t":"Aceite Motul 800 2t 1l Off Road Racing Oil 100% Sintetico","p":66900},{"id":"MLA1264127914","t":"Aceite para motor Motul sintético 5W-40 para auto/camioneta de 1 unidad x 1L","p":29000},{"id":"MLA1430569549","t":"Motul 8100 X-clean Efe 5/30 X 5 Lts","p":96866,"a":101965},{"id":"MLA1384261571","t":"Aceite TotalEnergies Quartz Ineo First 0W-30 4L","p":170000},{"id":"MLA1320080991","t":"Aceite Para Motor Motul Sintético 5w-30 Para Autos,1 Litro","p":29000},{"id":"MLA3274788926","t":"Aceite Valvoline Advanced 5w20 Sintético X 3.78 Litros","p":108775,"a":114500},{"id":"MLA1356399138","t":"Aceite Petronas Syntium 1000 10W-40","p":56500},{"id":"MLA1478133893","t":"Aceite mobil super 10w40 semi sintetico x 4L","p":53495},{"id":"MLA1179027255","t":"Aceite TotalEnergies Quartz 7000 10w-40 SN x 1L","p":29000},{"id":"MLA3329129160","t":"Aceite Sintetico Advanced 5w30 Valvoline","p":108775,"a":114500},{"id":"MLA3434725834","t":"Aceite Mineral Ultra Viscocity 25w-60 3.8l Valvoline","p":41900},{"id":"MLA1326940056","t":"Aceite Valvoline Atf+4 Transmision Automatica X 1 L","p":37289},{"id":"MLA1744158168","t":"Aceite para motor Valvoline semi-sintético 10W-40 para auto/camioneta de 4 unidades / 16L","p":175000},{"id":"MLA2901581840","t":"Aceite Valvoline Sintetico 5w30 4.73 lts High Mileage","p":145586},{"id":"MLA4021906780","t":"Paq. De 2 Aceite Para Moto 4t Motul 3000 20w50 1l Mineral","p":28500},{"id":"MLA4082608726","t":"Aceite para motor Motul sintético 5W-40 para auto/camioneta 1 pack de 2 unidades x 5L / 10L","p":192125},{"id":"MLA1744044528","t":"Valvoline Dexron VI ATF 946 mL","p":38613},{"id":"MLA1499112067","t":"Aceite 10w50 Moto Valvoline Synpower 4t Sintetico 1 Litro","p":28500}]
+;
+
+const Engine = (() => {
+  const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/(\d+)\s*w\s*[-\/]?\s*(\d+)/g, "$1w$2").replace(/\b(\d{1,2})\/(\d{2})\b/g, "$1w$2")
+    .replace(/\b(hr|cr|wr)-v\b/g, "$1v").replace(/\bt-cross\b/g, "tcross").replace(/\bka\s*\+/g, "ka");
+  const STOP = new Set(("de la el los las lo le para por con sin un una unos que este esta ese esa es son hola buenas buen dia tardes noches " +
+    "tiene tienen tenes hay sirve sirven aceite y o en del al mi me se si no te su sus como cuando cual quisiera queria saber consulta gracias " +
+    "x lts lt litro litros l unidad unidades auto autos producto").split(" "));
+  const tokens = (s) => norm(s).split(/[^a-z0-9.]+/).map((t) => t.replace(/^\.+|\.+$/g, "")).filter((t) => t.length > 1 && !STOP.has(t));
+
+  const INTENTS = [
+    { key: "compat", label: "Compatibilidad", re: /(sirve|sirven|le va|va (para|bien|en)|compatib|corresponde|es para|anda (para|en|bien)|puedo (usar|poner|ponerle)|lo uso|le pongo|para mi |motor \d|que lleva|lleva (mi|el))/ },
+    { key: "litros", label: "Litros", re: /(cuant[oa]s? (litros|bidones|botellas|lleva)|cuanto aceite|capacidad|alcanza|cantidad de aceite|me alcanza|necesito \d+ ?(l|lts|litros))/ },
+    { key: "stock", label: "Stock", re: /(stock|disponib|\btenes\b|\btienen\b|\btenga[ns]?\b|\bhay\b|queda|entrega inmediata|lo tenes|lo tienen|siguen? (teniendo|vendiendo))/ },
+    { key: "recomendar", label: "Recomendación", re: /(recomend|aconsej|cual (me )?(conviene|es mejor|uso|usar|lleva)|que aceite|diferencia|mejor opcion|cual es el mejor|sintetico o|semi ?sintetico o|mineral o)/ },
+    { key: "precio", label: "Precio", re: /(precio|cuanto (sale|cuesta|esta|vale)|descuento|por mayor|mayorista|si llevo|varias|\d+ unidades|oferta|rebaja|mejor precio|cantidad)/ },
+    { key: "pago", label: "Pagos", re: /(cuotas|tarjeta|efectivo|transferencia|mercado ?pago|forma de pago|medios de pago)/ },
+    { key: "envio", label: "Envío", re: /(envio|envias|envian|llega|demora|tarda|retir|domicilio|correo|full|flete|mandan|mandas|despach|cuando sale|hoy|manana|zona|codigo postal|cp \d)/ },
+    { key: "factura", label: "Factura", re: /factura/ },
+    { key: "original", label: "Original", re: /(original|trucho|falsific|vencimiento|fecha de (venc|fabric)|sellad|\bnuevo\b|lote)/ },
+    { key: "equivalencia", label: "Equivalencia", re: /(equivalen|reemplaz|codigo|numero de (filtro|parte)|homolog|es igual al|mismo que)/ },
+    { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
+    { key: "filtros", label: "Filtros", re: /filtro/ },
+    { key: "combo", label: "Combo / service", re: /(kit|combo|incluye|viene con|todo lo (que|necesario)|service|cambio de aceite y filtro)/ },
+  ];
+  function detectIntents(q) {
+    const n = " " + norm(q) + " ";
+    return new Set(INTENTS.filter((i) => i.re.test(n)).map((i) => i.key));
+  }
+
+  // ---- Vehículos
+  const BRANDS = { volkswagen: ["vw", "volkswagen", "volks"], chevrolet: ["chevrolet", "chevy", "chevrolet"], ford: ["ford"], fiat: ["fiat"],
+    renault: ["renault"], peugeot: ["peugeot"], citroen: ["citroen"], toyota: ["toyota"], honda: ["honda"], nissan: ["nissan"],
+    hyundai: ["hyundai"], kia: ["kia"], jeep: ["jeep"], ram: ["ram"], "mercedes-benz": ["mercedes", "benz"], bmw: ["bmw"], audi: ["audi"],
+    suzuki: ["suzuki"], mitsubishi: ["mitsubishi"], chery: ["chery"], dodge: ["dodge"], iveco: ["iveco"] };
+  const BRAND_NAME = { volkswagen: "Volkswagen", chevrolet: "Chevrolet", ford: "Ford", fiat: "Fiat", renault: "Renault", peugeot: "Peugeot",
+    citroen: "Citroën", toyota: "Toyota", honda: "Honda", nissan: "Nissan", hyundai: "Hyundai", kia: "Kia", jeep: "Jeep", ram: "RAM",
+    "mercedes-benz": "Mercedes-Benz", bmw: "BMW", audi: "Audi", suzuki: "Suzuki", mitsubishi: "Mitsubishi", chery: "Chery", dodge: "Dodge", iveco: "Iveco" };
+  const M = (brand, list, needBrand) => list.split(" ").map((m) => [m, { brand, needBrand: !!needBrand }]);
+  const MODELS = Object.fromEntries([
+    ...M("volkswagen", "gol trend voyage suran fox crossfox up polo virtus vento golf bora jetta senda amarok saveiro taos tiguan nivus tcross passat scirocco"),
+    ...M("chevrolet", "corsa classic onix prisma cruze tracker s10 trailblazer spin agile celta astra vectra zafira meriva cobalt aveo captiva montana equinox"),
+    ...M("ford", "ka fiesta focus ecosport ranger territory mondeo maverick kuga escort transit"),
+    ...M("fiat", "palio siena uno punto cronos argo mobi toro strada fiorino idea duna pulse ducato"),
+    ...M("renault", "clio sandero logan kangoo duster stepway megane fluence kwid captur symbol oroch alaskan koleos twingo master"),
+    ...M("peugeot", "206 207 208 307 308 408 306 405 301 504 partner expert boxer"), ...M("peugeot", "2008 3008 5008", true),
+    ...M("citroen", "c3 c4 berlingo xsara picasso c5 aircross ds3 cactus lounge"),
+    ...M("toyota", "hilux corolla etios yaris sw4 rav4 camry"),
+    ...M("honda", "civic fit city hrv crv wrv"),
+    ...M("nissan", "frontier march versa sentra kicks tiida note"),
+    ...M("hyundai", "tucson i10 i30 creta hb20"), ...M("jeep", "renegade compass"),
+  ]);
+  function extractVehicle(q) {
+    const n = norm(q);
+    const toks = n.split(/[^a-z0-9.]+/).filter(Boolean);
+    let brand = null;
+    for (const [b, al] of Object.entries(BRANDS)) if (toks.some((t) => al.includes(t))) { brand = b; break; }
+    let model = null;
+    for (const t of toks) {
+      const m = MODELS[t];
+      if (!m) continue;
+      if (m.needBrand && brand !== m.brand) continue;
+      if (brand && brand !== m.brand) continue;
+      model = t; brand = brand || m.brand; break;
+    }
+    if (model === "gol" && toks.includes("trend")) model = "gol trend";
+    const yr = n.match(/\b(19[89]\d|20[0-3]\d)\b/);
+    const year = yr && !(model === yr[1]) ? yr[1] : null;
+    const eng = n.match(/\b([0-6][.,]\d)\b/);
+    const fuel = (n.match(/\b(tdi|hdi|jtd|dci|tsi|diesel|nafta|gnc|turbo)\b/) || [])[1] || null;
+    if (!brand && !model) return null;
+    const cap = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+    const label = [BRAND_NAME[brand] || "", model ? (/^[a-z ]+$/.test(model) ? cap(model) : model.toUpperCase()) : "", eng ? eng[1].replace(",", ".") : "", fuel ? (fuel.length <= 3 ? fuel.toUpperCase() : fuel) : "", year || ""]
+      .filter(Boolean).join(" ");
+    return { brand, model, year, engine: eng ? eng[1].replace(",", ".") : null, label };
+  }
+  function findGuide(guide, q, veh) {
+    if (!veh || !guide.length) return null;
+    const qset = new Set(tokens(q));
+    if (veh.brand) (BRANDS[veh.brand] || []).concat(veh.brand).forEach((a) => qset.add(a));
+    if (veh.model) veh.model.split(" ").forEach((t) => qset.add(t));
+    let best = null, bestN = 0;
+    for (const g of guide) {
+      const gt = tokens(g.veh).map((t) => t.replace(",", "."));
+      const brandAlias = Object.entries(BRANDS).find(([b, al]) => gt.some((t) => al.includes(t) || t === b));
+      const need = gt.filter((t) => !(brandAlias && (brandAlias[1].includes(t) || t === brandAlias[0])));
+      if (brandAlias && veh.brand && brandAlias[0] !== veh.brand) continue;
+      if (need.length && need.every((t) => qset.has(t)) && gt.length > bestN) { best = g; bestN = gt.length; }
+    }
+    return best;
+  }
+
+  const viscOf = (s) => (norm(s).match(/\b\d{1,2}w\d{2}\b/g) || []);
+  const fmtVisc = (v) => v ? v.toUpperCase().replace("W", "W-") : "";
+  const litersOf = (s) => {
+    const n = norm(s);
+    const m = n.match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litros?)\b/) || n.match(/\bx\s?(\d+(?:[.,]\d+)?)\s?l/);
+    if (m) return parseFloat(m[1].replace(",", "."));
+    const ml = n.match(/(\d{3,4})\s?ml\b/);
+    return ml ? Number(ml[1]) / 1000 : null;
+  };
+
+  // ---- Catálogo
+  const hasVisc = (n, v) => new RegExp("(^|[^0-9])" + v + "([^0-9]|$)").test(n);
+  function prep(it) { if (!it._n) Object.defineProperty(it, "_n", { value: norm(it.t), enumerable: false }); return it; }
+  function scoreItems(catalog, text) {
+    const toks = [...new Set(tokens(text))];
+    if (!toks.length) return [];
+    const viscs = new Set(viscOf(text));
+    return catalog.map((it) => {
+      prep(it);
+      let s = 0;
+      for (const t of toks) if (viscs.has(t) ? hasVisc(it._n, t) : it._n.includes(t)) s += viscs.has(t) ? 5 : t.length > 3 ? 2 : 1;
+      if (viscs.size && ![...viscs].some((v) => hasVisc(it._n, v))) s -= 3;
+      return { it, s };
+    }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+  }
+  const keyOf = (it) => it.id || norm(it.t);
+  const linkOf = (it) => it && it.id ? "https://articulo.mercadolibre.com.ar/MLA-" + it.id.replace(/^MLA-?/i, "") : "";
+
+  // ---- Importar texto del listado de Mercado Libre (o filas de Excel)
+  function parseMoney(x) {
+    const s = String(x).replace(/[$\s]/g, "");
+    if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Math.round(parseFloat(s.replace(/\./g, "").replace(",", ".")));
+    if (/^\d+([.,]\d+)?$/.test(s)) return Math.round(parseFloat(s.replace(",", ".")));
+    return 0;
+  }
+  function idFrom(url) {
+    const m = String(url).match(/[?&#]wid=(MLA\d+)/i) || String(url).match(/\/(MLA-?\d{8,})(?:[-_/]|$)/i);
+    return m ? m[1].replace("-", "").toUpperCase() : undefined;
+  }
+  const NOT_TITLE = /^(mas vendido|mas relevantes|ordenar|llega|envio|mismo precio|cuota|oferta|recomendado|patrocinado|disponible|ver mas|mostrar|anterior|siguiente|resultados|filtros|full|vendido por|tienda oficial|\d+% off|\d+(\.\d)?$|\(\d+\))/;
+  const isTitle = (l) => l.length >= 12 && /[a-z]{3}/i.test(l) && !/\$/.test(l) && !NOT_TITLE.test(norm(l));
+  function parseListing(text) {
+    const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const out = new Map();
+    const add = (it) => { if (it && it.t && it.p > 0) out.set(keyOf(it), it); };
+    // Filas de Excel (separadas por tabulación)
+    if (lines.filter((l) => l.includes("\t")).length >= Math.max(1, lines.length * 0.5)) {
+      for (const l of lines) {
+        const c = l.split("\t").map((s) => s.trim());
+        const idc = c.find((x) => /^MLA-?\d{6,}$/i.test(x));
+        const t = c.filter((x) => /[a-z]{3}/i.test(x) && !/^MLA-?\d+$/i.test(x)).sort((a, b) => b.length - a.length)[0];
+        const nums = c.filter((x) => x !== idc).map(parseMoney).filter((n) => n > 0);
+        if (t && nums.length) add({ ...(idc ? { id: idc.replace("-", "").toUpperCase() } : {}), t, p: nums[0], ...(nums[1] > nums[0] ? { a: nums[1] } : {}) });
+      }
+      return [...out.values()];
+    }
+    const start = lines.findIndex((l) => /^(resultados|ordenar por)/i.test(l));
+    const L = start >= 0 ? lines.slice(start + 1) : lines;
+    let cur = null;
+    const flush = () => {
+      if (cur && cur.prices.length) {
+        const [a, b] = cur.prices;
+        const it = { t: cur.t, p: b && a > b ? b : a };
+        if (b && a > b) it.a = a;
+        if (cur.id) it.id = cur.id;
+        add(it);
+      }
+      cur = null;
+    };
+    for (const l of L) {
+      const md = l.match(/^(?:\d+\.\s*)?(?:[A-ZÁÉÍÓÚ ]{4,}\s+)?\[([^\]]{8,})\]\(([^)]+)\)/);
+      if (md) { flush(); cur = { t: md[1].trim(), id: idFrom(md[2]), prices: [] }; continue; }
+      const tag = l.match(/^(?:\d+\.\s*)?(.*\S)\s*\[id:(MLA\d+)\]$/);
+      if (tag && isTitle(tag[1])) { flush(); cur = { t: tag[1], id: tag[2], prices: [] }; continue; }
+      if (/cuotas? de/i.test(l)) continue;
+      const pm = [...l.matchAll(/\$\s?(\d{1,3}(?:\.\d{3})+|\d+)/g)];
+      if (pm.length) { if (cur) pm.forEach((m) => cur.prices.push(Number(m[1].replace(/\./g, "")))); continue; }
+      const t = l.replace(/^\d+\.\s*/, "");
+      if (isTitle(t)) { flush(); cur = { t, prices: [] }; }
+    }
+    flush();
+    return [...out.values()];
+  }
+
+  // ---- Redacción de la respuesta
+  const TU = [["podés", "puedes"], ["tenés", "tienes"], ["indicás", "indicas"], ["querés", "quieres"], ["pasás", "pasas"], ["necesitás", "necesitas"],
+    ["indicanos", "indícanos"], ["pasanos", "pásanos"], ["consultanos", "consúltanos"], ["avisanos", "avísanos"], ["cargá", "carga"], ["fijate", "fíjate"],
+    ["elegí", "elige"], ["vas a necesitar", "necesitarás"], ["contás", "cuentas"], ["escribinos", "escríbenos"], ["sumá", "suma"]];
+  function toTu(s) {
+    for (const [v, t] of TU) s = s.replace(new RegExp("(^|[^\\p{L}])(" + v + ")(?=[^\\p{L}]|$)", "giu"), (m, pre, w) => pre + (w[0] === w[0].toUpperCase() ? t[0].toUpperCase() + t.slice(1) : t));
+    return s;
+  }
+  const prodName = (t) => {
+    let s = String(t).replace(/\s+para (auto|autos)\/?camioneta.*$/i, "").replace(/\s+-\s+.*$/, "").trim();
+    if (s.length > 70) s = s.slice(0, 67).replace(/\s+\S*$/, "") + "…";
+    return /^(aceite|filtro|refrigerante|bid[oó]n|liquido|líquido|paq)/i.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+  };
+  const money = (n) => "$" + Number(n).toLocaleString("es-AR");
+  function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+
+  // ---- Guía precargada de vehículos (datos orientativos: confirmar siempre con el manual)
+  const VEH_DATA = [
+"Volkswagen|Gol Trend/Voyage/Saveiro|1.6 8v|2009-2023|nafta|5W-40|10W-40|3,5|VW 502.00",
+"Volkswagen|Gol/Gol Power|1.4 8v|2004-2012|nafta|5W-40|10W-40||VW 502.00",
+"Volkswagen|Gol/Senda/Saveiro|1.6 8v AP|1995-2012|nafta|15W-40|10W-40||API SL",
+"Volkswagen|Suran/Fox/CrossFox|1.6 8v|2006-2019|nafta|5W-40|10W-40|3,5|VW 502.00",
+"Volkswagen|Up|1.0 MPI|2014-2021|nafta|5W-40|||VW 502.00",
+"Volkswagen|Polo/Virtus/Nivus/TCross|1.6 MSI|2017-2024|nafta|5W-40|||VW 502.00",
+"Volkswagen|Polo/Virtus/Nivus/TCross/Taos|1.0 TSI|2018-2025|nafta|5W-40|||VW 502.00",
+"Volkswagen|Vento/Golf/Jetta|1.4 TSI|2014-2024|nafta|5W-40|||VW 502.00",
+"Volkswagen|Vento/Bora/Golf/Jetta|2.0 8v|2006-2015|nafta|5W-40|10W-40||VW 502.00",
+"Volkswagen|Vento/Bora|2.5|2006-2014|nafta|5W-40|||VW 502.00",
+"Volkswagen|Bora/Golf/Vento|1.9 TDI|1999-2014|diesel|5W-40|||VW 505.01",
+"Volkswagen|Amarok|2.0 TDI|2010-2023|diesel|5W-30|||VW 507.00",
+"Volkswagen|Amarok|3.0 V6 TDI|2017-2025|diesel|5W-30|||VW 507.00",
+"Chevrolet|Corsa/Classic/Celta/Agile/Montana|1.4 8v|2006-2016|nafta|10W-40|15W-40||API SL",
+"Chevrolet|Corsa/Classic/Meriva|1.8 8v|2003-2012|nafta|10W-40|15W-40||API SL",
+"Chevrolet|Corsa/Classic|1.6 8v|1994-2010|nafta|15W-40|10W-40||API SL",
+"Chevrolet|Onix/Prisma|1.4|2012-2019|nafta|5W-30|10W-40||dexos1",
+"Chevrolet|Onix/Onix Plus|1.0 Turbo|2019-2025|nafta|5W-30|||dexos1 Gen2",
+"Chevrolet|Onix/Onix Plus|1.2|2019-2025|nafta|5W-30|||dexos1 Gen2",
+"Chevrolet|Tracker|1.2 Turbo|2020-2025|nafta|5W-30|||dexos1 Gen2",
+"Chevrolet|Cruze|1.4 Turbo|2016-2025|nafta|5W-30|||dexos1 Gen2",
+"Chevrolet|Cruze/Tracker/Spin/Cobalt|1.8|2011-2019|nafta|5W-30|10W-40||dexos1",
+"Chevrolet|S10/Trailblazer|2.8 TD|2012-2025|diesel|5W-30|15W-40||dexos2",
+"Chevrolet|Aveo|1.6|2008-2014|nafta|5W-30|10W-40||API SL",
+"Chevrolet|Astra/Vectra/Zafira|2.0|2000-2012|nafta|10W-40|15W-40||API SL",
+"Ford|Ka/Ka+|1.5|2016-2021|nafta|5W-20|5W-30||Ford WSS-M2C945",
+"Ford|Fiesta/Fiesta Kinetic/EcoSport/Focus|1.6 Sigma|2010-2019|nafta|5W-20|5W-30||Ford WSS-M2C945",
+"Ford|Focus/EcoSport/Kuga|2.0|2008-2019|nafta|5W-30|5W-20||Ford WSS-M2C913",
+"Ford|Ranger|2.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
+"Ford|Ranger|3.2 TDCi|2012-2023|diesel|5W-30|||Ford WSS-M2C913",
+"Fiat|Palio/Siena/Grand Siena/Uno/Strada/Idea|1.4 Fire|2006-2020|nafta|15W-40|10W-40||API SL",
+"Fiat|Cronos/Argo/Mobi/Strada/Pulse|1.3 Firefly|2018-2025|nafta|0W-20|||API SN Plus",
+"Fiat|Mobi/Uno/Argo|1.0 Firefly|2017-2025|nafta|0W-20|||API SN Plus",
+"Renault|Sandero/Logan/Kangoo/Clio/Symbol|1.6 8v K7M|2007-2020|nafta|10W-40|15W-40||RN0700",
+"Renault|Sandero/Logan/Duster/Kangoo/Captur/Fluence/Megane/Stepway|1.6 16v K4M|2007-2021|nafta|5W-40|10W-40|4,8|RN0700",
+"Renault|Duster/Fluence/Captur/Megane|2.0 F4R|2011-2021|nafta|5W-40|10W-40|5,4|RN0700",
+"Renault|Kangoo|1.5 dCi|2008-2020|diesel|5W-30|||RN0720",
+"Peugeot|206/207/Partner|1.4 8v TU3|2000-2015|nafta|10W-40|15W-40||PSA B71 2300",
+"Citroen|C3|1.4 8v TU3|2003-2012|nafta|10W-40|15W-40||PSA B71 2300",
+"Peugeot|207/208/2008/307/Partner|1.6 16v TU5|2006-2019|nafta|10W-40|5W-40||PSA B71 2300",
+"Citroen|C3/C4/Berlingo|1.6 16v TU5|2006-2019|nafta|10W-40|5W-40||PSA B71 2300",
+"Peugeot|208/2008/308|1.6 VTi EC5|2016-2025|nafta|5W-30|5W-40||PSA B71 2290",
+"Citroen|C3/C4 Cactus/C4 Lounge|1.6 VTi EC5|2016-2025|nafta|5W-30|5W-40||PSA B71 2290",
+"Peugeot|308/408/3008|1.6 THP|2010-2022|nafta|5W-30||4,25|PSA B71 2290",
+"Citroen|C4/C4 Lounge/DS3|1.6 THP|2010-2022|nafta|5W-30||4,25|PSA B71 2290",
+"Peugeot|307/308/408|2.0 16v EW10|2005-2016|nafta|5W-40|10W-40|4,25|PSA B71 2296",
+"Peugeot|Partner/208/308/408|1.6 HDi|2008-2020|diesel|5W-30||3,75|PSA B71 2290",
+"Citroen|Berlingo/C4|1.6 HDi|2008-2020|diesel|5W-30||3,75|PSA B71 2290",
+"Toyota|Hilux/SW4|2.8 1GD|2016-2025|diesel|5W-30|15W-40||Toyota DL-1 / API CF-4",
+"Toyota|Hilux/SW4|2.4 2GD|2016-2025|diesel|5W-30|15W-40||Toyota DL-1 / API CF-4",
+"Toyota|Hilux/SW4|3.0 D-4D 1KD|2005-2015|diesel|15W-40|5W-30||API CF-4",
+"Toyota|Hilux|2.5 D-4D 2KD|2005-2015|diesel|15W-40|5W-30||API CF-4",
+"Toyota|Etios|1.5|2013-2023|nafta|5W-30|0W-20||API SN",
+"Toyota|Corolla|1.8|2008-2019|nafta|5W-30|0W-20|4,2|API SN",
+"Toyota|Corolla/Corolla Cross|2.0|2020-2025|nafta|0W-20|||API SP",
+"Toyota|Yaris|1.5|2018-2025|nafta|0W-20|5W-30||API SN",
+"Honda|Civic|1.8|2006-2016|nafta|5W-20|0W-20||API SN",
+"Honda|Civic|2.0|2017-2021|nafta|0W-20|||API SN",
+"Honda|Fit/City|1.5|2009-2021|nafta|5W-20|0W-20||API SN",
+"Honda|HRV|1.8|2015-2022|nafta|0W-20|5W-20||API SN",
+"Nissan|March/Versa/Note/Kicks|1.6|2011-2025|nafta|5W-30|10W-30||API SN",
+"Nissan|Frontier|2.3 dCi|2016-2025|diesel|5W-30|||ACEA C3",
+"Nissan|Sentra|1.8|2013-2019|nafta|5W-30|0W-20||API SN"
+];
+  const brandKeyOf = (marca) => { const n = norm(marca); return Object.keys(BRANDS).find((k) => k === n || BRANDS[k].includes(n)) || null; };
+  const VEHICLES = VEH_DATA.map((l) => {
+    const [marca, modelos, motor, anios, comb, visc, alt, litros, norma] = l.split("|").map((x) => x.trim());
+    const [y1, y2] = anios.split("-").map(Number);
+    return { marca, brand: brandKeyOf(marca), modelos: modelos.split("/"), motor, y1, y2, comb, visc, alt, litros, norma, pre: true };
+  });
+  const vehName = (v) => v.custom ? v.veh : (BRAND_NAME[v.brand] || v.marca) + " " + v.modelos.join("/") + " " + v.motor;
+  function matchVehicles(q, veh, custom) {
+    if (!veh || !veh.model) return { exact: null, options: [] };
+    const c = findGuide(custom, q, veh);
+    if (c) return { exact: { ...c, custom: true }, options: [] };
+    const n = norm(q);
+    const qset = new Set(tokens(q));
+    veh.model.split(" ").forEach((t) => qset.add(t));
+    let best = 0;
+    let cands = VEHICLES.map((v) => {
+      if (veh.brand && v.brand !== veh.brand) return null;
+      let spec = 0;
+      v.modelos.forEach((m) => { const mt = tokens(m); if (mt.length && mt.every((t) => qset.has(t))) spec = Math.max(spec, mt.length); });
+      return spec ? { v, spec } : null;
+    }).filter(Boolean);
+    cands.forEach((x) => (best = Math.max(best, x.spec)));
+    cands = cands.filter((x) => x.spec === best).map((x) => x.v);
+    const narrow = (f) => { const r = cands.filter(f); if (r.length) cands = r; };
+    if (veh.engine) narrow((v) => v.motor.startsWith(veh.engine));
+    const kw = (v) => tokens(v.motor).filter((t) => !/^\d/.test(t) || /^\d+v$/.test(t));
+    if (cands.some((v) => kw(v).some((t) => qset.has(t)))) narrow((v) => kw(v).some((t) => qset.has(t)));
+    if (/\b(diesel|tdi|hdi|dci|tdci|td|d4d|gasoil)\b/.test(n)) narrow((v) => v.comb === "diesel");
+    else if (/\bnaft/.test(n)) narrow((v) => v.comb === "nafta");
+    if (veh.year) { const y = Number(veh.year); narrow((v) => y >= v.y1 && y <= v.y2); }
+    if (cands.length === 1) return { exact: cands[0], options: cands };
+    if (cands.length > 1 && new Set(cands.map((v) => v.visc)).size === 1) {
+      const lit = [...new Set(cands.map((v) => v.litros))];
+      return { exact: { ...cands[0], litros: lit.length === 1 ? lit[0] : "", merged: true }, options: cands };
+    }
+    return { exact: null, options: cands };
+  }
+
+  // ---- Combo para el vehículo: aceite por viscosidad + filtros cuyo título nombra el modelo
+  function filterCat(n) {
+    if (/filtro\s+(de\s+)?aceite/.test(n)) return "aceite";
+    if (/(habitaculo|polen|cabina|antipolen|aire acondicionado)/.test(n)) return "habitáculo";
+    if (/filtro\s+(de\s+)?aire/.test(n)) return "aire";
+    if (/filtro\s+(de\s+)?(combustible|nafta|gasoil)/.test(n)) return "combustible";
+    if (/aceite/.test(n)) return "aceite";
+    if (/\baire\b/.test(n)) return "aire";
+    if (/(combustible|nafta|gasoil)/.test(n)) return "combustible";
+    return null;
+  }
+  function comboFor(catalog, veh, g, q) {
+    const res = { oil: null, filters: [] };
+    if (!veh || !veh.model) return res;
+    const mt = veh.model.split(" ");
+    const has = (n, t) => new RegExp("(^|[^a-z0-9])" + t.replace(/[.+]/g, "\\$&") + "([^a-z0-9]|$)").test(n);
+    const gv = g && g.visc ? viscOf(g.visc)[0] : null;
+    if (gv) {
+      const need = g.litros ? parseFloat(String(g.litros).replace(",", ".")) : 4;
+      const qt = tokens(q).filter((t) => t.length > 3);
+      const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !/filtro|\b(2t|4t|moto)\b/.test(it._n); });
+      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0); };
+      res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
+    }
+    const byCat = {};
+    catalog.forEach((it) => {
+      prep(it);
+      if (!/filtro/.test(it._n) || !mt.every((t) => has(it._n, t))) return;
+      const c = filterCat(it._n);
+      if (c) (byCat[c] = byCat[c] || []).push(it);
+    });
+    ["aceite", "aire", "combustible", "habitáculo"].forEach((c) => {
+      const list = byCat[c];
+      if (!list) return;
+      const it = (veh.engine && list.find((x) => x._n.includes(veh.engine))) || list[0];
+      res.filters.push({ cat: c, it });
+    });
+    return res;
+  }
+
+  function compose(ctx) {
+    const { intents, prod, veh, guide, options = [], alt, combo = { oil: null, filters: [] }, settings: S, seed = 0, q = "" } = ctx;
+    const pick = (key, arr) => arr[(seed + hash(key)) % arr.length];
+    const P = prod ? prodName(prod.t) : "";
+    const isFilter = prod && /filtro/i.test(prod.t);
+    const pv = prod && !isFilter ? viscOf(prod.t)[0] : null;
+    const gv = guide && guide.visc ? viscOf(guide.visc)[0] : null;
+    const linked = new Set();
+    const lk = (it) => { if (!it || !S.link || !it.id || linked.has(it.id)) return ""; linked.add(it.id); return " " + linkOf(it); };
+    const filterName = (t) => { const n = prodName(t).replace(/^filtro\s+(de\s+)?(aceite|aire acondicionado|aire|combustible|nafta|gasoil|habit[aá]culo|polen|cabina)\s*/i, ""); return n || prodName(t); };
+    const out = [];
+    let asked = false;
+    const askData = () => { if (asked) return ""; asked = true; return pick("ask", ["Para confirmarte, ¿nos indicás marca, modelo, año y motor de tu vehículo?", "Así te asesoramos bien, ¿nos pasás marca, modelo, año y motor del vehículo?"]); };
+    const wantsFilters = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia") || isFilter;
+    const vehTalk = intents.has("compat") || intents.has("litros") || intents.has("recomendar") || intents.has("combo");
+    const ambiguous = !guide && veh && veh.model && options.length > 1;
+    const oilTalk = !isFilter || intents.has("litros") || /\baceite\b/.test(norm(q).replace(/filtros? (de |del |para )?aceite/g, ""));
+
+    out.push(pick("hola", ["¡Hola! Gracias por tu consulta.", "¡Hola! ¿Cómo estás? Gracias por escribirnos.", "¡Hola! Muchas gracias por tu pregunta."]));
+
+    if (vehTalk && guide && veh) {
+      const parts = [];
+      if (gv && oilTalk) parts.push("se recomienda aceite " + fmtVisc(gv) + (guide.alt ? " (también " + guide.alt + ")" : "") + (guide.norma ? ", que cumpla la norma " + guide.norma : ""));
+      if (guide.litros && oilTalk) parts.push("lleva aproximadamente " + guide.litros + " litros con cambio de filtro");
+      if (isFilter && guide.fa) parts.push("el filtro de aceite que corresponde es " + guide.fa);
+      if (parts.length) out.push("Para tu " + veh.label + " " + parts.join(" y ") + ".");
+      if (prod && pv && gv) {
+        if (pv === gv) out.push(pick("ok", ["El " + P + " cumple con esa viscosidad, así que es el indicado.", "El " + P + " es " + fmtVisc(pv) + ", así que te va perfecto."]));
+        else out.push("El " + P + " es " + fmtVisc(pv) + ", por eso te recomendamos un " + fmtVisc(gv) + (alt ? ": el " + prodName(alt.t) + " es ideal." : "."));
+      } else if ((!prod || isFilter) && oilTalk && combo.oil) {
+        out.push(pick("oilrec", ["De nuestra tienda te recomendamos el " + prodName(combo.oil.t) + ".", "El ideal de nuestra tienda es el " + prodName(combo.oil.t) + "."]) + lk(combo.oil));
+      }
+      if (guide.nota) out.push("Dato útil: " + guide.nota + ".");
+      if (guide.pre && parts.length) out.push("Igualmente te recomendamos confirmarlo en el manual del vehículo.");
+    } else if (vehTalk && ambiguous) {
+      const opts = options.slice(0, 3).map((v) => v.visc + " en el " + v.motor + " (" + v.y1 + "-" + v.y2 + ")");
+      out.push("Para tu " + veh.label + " depende del motor y el año: " + opts.join(", ") + ". ¿Nos confirmás año y motor así te indicamos el producto exacto?");
+      asked = true;
+    } else if (intents.has("compat")) {
+      if (veh && veh.model) {
+        if (pv) out.push("El " + P + " es " + fmtVisc(pv) + ". Te recomendamos confirmar en el manual de tu " + veh.label + " que indique esa viscosidad; si es así, es el indicado.");
+        else if (isFilter) out.push("Para confirmarte que el filtro corresponde a tu " + veh.label + ", fijate el código del filtro que tiene colocado o el que indica el manual.");
+        else out.push("Para tu " + veh.label + " te recomendamos usar la viscosidad que indica el manual del vehículo.");
+        if (!veh.year || !veh.engine) out.push(pick("ask2", ["Si nos indicás año y motor, te confirmamos.", "Si querés, pasanos año y motor y lo verificamos."]));
+      } else out.push(askData());
+    }
+
+    if (intents.has("litros")) {
+      const oil = prod && !isFilter ? prod : combo.oil;
+      const pl = oil ? litersOf(oil.t) : null;
+      const gl = guide && guide.litros ? parseFloat(String(guide.litros).replace(",", ".")) : null;
+      if (gl && pl && pl < gl) out.push("Como el envase es de " + String(pl).replace(".", ",") + " litros, vas a necesitar " + Math.ceil(gl / pl) + " unidades para el cambio completo.");
+      else if (gl && pl) out.push("Con un envase de " + String(pl).replace(".", ",") + " litros te alcanza para el cambio completo.");
+      else if (!gl && !ambiguous) {
+        out.push("La cantidad depende del motor: en general los autos llevan entre 3,5 y 5 litros con cambio de filtro.");
+        if (!veh || !veh.model) { const a = askData(); if (a) out.push(a); }
+        else if (!(guide && guide.pre)) out.push("Te recomendamos confirmarlo en el manual del vehículo.");
+      }
+    }
+
+    if (intents.has("stock")) {
+      out.push(prod ? pick("stock", ["Sí, tenemos stock disponible del " + P + ".", "Sí, el " + P + " está disponible.", "¡Sí, hay stock disponible!"])
+        : pick("stock0", ["Sí, tenemos stock disponible de lo publicado.", "Sí, contamos con disponibilidad. Podés comprar directamente desde la publicación."]));
+    }
+
+    if (intents.has("recomendar") && !(guide && veh) && !ambiguous) {
+      if (prod) out.push(pick("rec", ["Te recomendamos el " + P + ", es una excelente opción.", "Una muy buena opción es el " + P + "."]));
+      else if (veh && veh.model) out.push("Para tu " + veh.label + " lo ideal es usar la viscosidad que indica el manual. Si nos decís cuál indica, te sugerimos la mejor opción de nuestra tienda.");
+      else { const a = askData(); if (a) out.push(a); }
+    }
+
+    if (wantsFilters && veh && veh.model) {
+      const fl = combo.filters;
+      if (fl.length) out.push("Para tu " + veh.label + " tenemos " + fl.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+      else if (guide && guide.fa && !isFilter) out.push("Para tu " + veh.label + " el filtro de aceite que corresponde es " + guide.fa + (guide.fai ? " y el de aire es " + guide.fai : "") + ".");
+      else if (!isFilter && !asked) {
+        asked = true;
+        out.push(veh.year && veh.engine ? "Si nos pasás el código del filtro que tiene colocado tu " + veh.label + ", te confirmamos cuál de nuestros filtros le corresponde."
+          : "Para indicarte el filtro exacto de tu " + veh.label + ", ¿nos pasás año y motor, o el código del filtro que tiene colocado?");
+      }
+    } else if (intents.has("equivalencia") || (intents.has("filtros") && !isFilter)) {
+      if (!asked) out.push("Si nos pasás el código de tu filtro actual, o marca, modelo, año y motor del vehículo, te confirmamos el equivalente.");
+    }
+
+    if (intents.has("precio")) {
+      out.push("El precio es el que figura en la publicación.");
+      if (/(mayor|varias|\d+ unidades|si llevo|cantidad)/.test(norm(q))) out.push("Si necesitás varias unidades, podés elegir la cantidad al momento de comprar.");
+    }
+    if (intents.has("pago") && S.pago) out.push(S.pago);
+    if (intents.has("envio") && S.envio) out.push(S.envio);
+    if (intents.has("factura") && S.factura) out.push(S.factura);
+    if (intents.has("original") && S.original) out.push(S.original);
+    if (intents.has("devolucion") && S.devolucion) out.push(S.devolucion);
+    if (intents.has("combo")) out.push("Podés sumar el aceite y los filtros al carrito y comprarlos juntos.");
+
+    const linkProd = alt && pv && gv && pv !== gv ? alt : prod;
+    const l = lk(linkProd);
+    if (l) out.push(pick("link", ["Podés agregarlo al carrito desde acá:", "Te dejo el link para que lo agregues al carrito:"]) + l);
+
+    if (S.despedida) out.push(S.despedida);
+    let text = out.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    if (S.trato === "tu") text = toTu(text);
+    return text;
+  }
+  const E_key = (it) => it ? keyOf(it) : "";
+
+  function similarity(a, b) {
+    const A = new Set(tokens(a)), B = new Set(tokens(b));
+    if (!A.size || !B.size) return 0;
+    let i = 0; A.forEach((t) => { if (B.has(t)) i++; });
+    return i / (A.size + B.size - i);
+  }
+
+  function extractQuestion(ocrText) {
+    const lines = String(ocrText).split(/\n/).map((l) => l.trim()).filter((l) => l.length > 3);
+    const qi = lines.map((l, i) => (l.includes("?") ? i : -1)).filter((i) => i >= 0);
+    if (!qi.length) return lines.join(" ");
+    const last = qi[qi.length - 1];
+    let from = last;
+    while (from > 0 && last - from < 3 && !/[?.!]$/.test(lines[from - 1]) && lines[from - 1].length > 15) from--;
+    return lines.slice(from, last + 1).join(" ");
+  }
+
+  return { norm, tokens, INTENTS, detectIntents, extractVehicle, findGuide, matchVehicles, comboFor, VEHICLES, vehName, viscOf, litersOf, scoreItems, keyOf, linkOf, parseListing, compose, similarity, extractQuestion, money, prodName };
+})();
+</script>
+
+<script>
+/* ==================== APP ==================== */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const E = Engine;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("grig." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("grig." + k, JSON.stringify(v)); return true; } catch { toast("No se pudo guardar en este navegador."); return false; } },
+  };
+  const DEFAULTS = {
+    trato: "vos", link: "1",
+    despedida: "¡Quedamos a disposición! Saludos, equipo grig.",
+    envio: "Hacemos envíos a todo el país por Mercado Envíos. En la publicación podés ver cuándo te llega según tu código postal; en muchas zonas llega en el día.",
+    factura: "Sí, emitimos factura. Una vez hecha la compra, cargá tus datos de facturación en Mercado Libre.",
+    pago: "Podés pagar con todos los medios que ofrece Mercado Pago, incluso en cuotas.",
+    original: "Todos nuestros productos son originales, nuevos y sellados, con fecha de vencimiento vigente.",
+    devolucion: "Si tenés algún inconveniente, podés gestionar el cambio o la devolución desde Mercado Libre.",
+  };
+  let catalog = store.get("catalog", null);
+  if (!Array.isArray(catalog)) { catalog = CATALOGO_INICIAL.slice(); store.set("catalog", catalog); }
+  let guide = store.get("vehicles", []);
+  let bank = store.get("bank", []);
+  let settings = { ...DEFAULTS, ...store.get("settings", {}) };
+
+  let state = { intents: new Set(), manual: null, prodKey: null, prodManual: false, seed: 0 };
+
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 1800); }
+
+  // ---- Pestañas
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    document.querySelectorAll(".pane").forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.tab));
+    if (b.dataset.tab === "cat") renderCatList();
+  }));
+
+  // ---- Responder
+  const intentBox = $("intents");
+  E.INTENTS.forEach((i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.k = i.key; b.textContent = i.label; b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      state.manual = state.manual || new Set(state.intents);
+      on ? state.manual.add(i.key) : state.manual.delete(i.key);
+      update(false);
+    });
+    intentBox.append(b);
+  });
+
+  function currentIntents() { return state.manual || state.intents; }
+  const findProd = (key) => catalog.find((it) => E.keyOf(it) === key) || null;
+
+  function analyze() {
+    const q = $("q").value;
+    state.intents = E.detectIntents(q);
+    state.manual = null;
+    state.seed = 0;
+    if (!state.prodManual) {
+      const top = E.scoreItems(catalog, q)[0];
+      state.prodKey = top && top.s >= 5 ? E.keyOf(top.it) : null;
+    }
+    update(true);
+  }
+
+  function update() {
+    const q = $("q").value;
+    const intents = currentIntents();
+    document.querySelectorAll("#intents .chip").forEach((c) => c.setAttribute("aria-pressed", String(intents.has(c.dataset.k))));
+    const veh = E.extractVehicle(q);
+    const m = E.matchVehicles(q, veh, guide);
+    const g = m.exact;
+    const prod = state.prodKey ? findProd(state.prodKey) : null;
+    const combo = E.comboFor(catalog, veh, g, q);
+    const gv = g && g.visc ? E.viscOf(g.visc)[0] : null;
+    const pv = prod && !/filtro/i.test(prod.t) ? E.viscOf(prod.t)[0] : null;
+    let alt = null;
+    if (gv && pv && pv !== gv) { alt = combo.oil; if (alt && E.keyOf(alt) === E.keyOf(prod)) alt = null; }
+
+    // Lo que detecté
+    const f = $("facts"); f.textContent = "";
+    const fact = (label, val, cls) => { const d = document.createElement("div"); if (cls) d.className = cls; const b = document.createElement("b"); b.textContent = label + ": "; d.append(b, val); f.append(d); };
+    if (!q.trim()) fact("Esperando", "pega una pregunta arriba");
+    else {
+      fact("Vehículo", veh ? veh.label : "no mencionado");
+      if (veh && veh.model) {
+        if (g) fact("Guía", E.vehName(g) + (g.y1 ? " (" + g.y1 + "-" + g.y2 + ")" : "") + " · " + [g.visc + (g.alt ? " / " + g.alt : ""), g.litros && g.litros + " L", g.norma, g.fa].filter(Boolean).join(" · ") + (g.pre ? " · orientativo" : ""));
+        else if (m.options.length > 1) fact("Según motor", m.options.slice(0, 4).map((v) => v.motor + " " + v.y1 + "-" + v.y2 + ": " + v.visc).join(" | "), "warn");
+        else fact("Guía", "este vehículo no está en la guía (cárgalo en Vehículos)", "warn");
+        const parts = [combo.oil && "aceite: " + E.prodName(combo.oil.t), ...combo.filters.map((x) => "filtro de " + x.cat + ": " + E.prodName(x.it.t))].filter(Boolean);
+        fact("Combo en tu catálogo", parts.length ? parts.join(" · ") : "no encontré productos que nombren este vehículo", parts.length ? "" : "warn");
+      }
+      const vs = E.viscOf(q); if (vs.length) fact("Viscosidad", vs.map((v) => v.toUpperCase().replace("W", "W-")).join(", "));
+      if (!intents.size) fact("Tema", "no lo detecté, elige uno abajo", "warn");
+      if (alt && prod) fact("Ojo", "el producto elegido es " + pv.toUpperCase() + " y la guía indica " + g.visc, "warn");
+    }
+
+    renderProducts(q, prod);
+    if (!q.trim()) { $("answer").value = ""; updateCount(); $("bankPanel").hidden = true; return; }
+    $("answer").value = E.compose({ intents, prod, veh, guide: g, options: m.options, alt, combo, settings: { ...settings, link: settings.link === "1" }, seed: state.seed, q });
+    updateCount();
+    renderBank(q);
+  }
+
+  function itemRow(it, opts) {
+    const lab = document.createElement("label"); lab.className = "pitem";
+    const r = document.createElement("input"); r.type = opts.radio ? "radio" : "hidden"; r.name = "prod";
+    if (opts.radio) { r.checked = opts.checked; r.addEventListener("change", opts.onPick); }
+    const t = document.createElement("div"); t.className = "t"; t.textContent = it.t;
+    if (it.id) { const id = document.createElement("div"); id.className = "id"; id.textContent = it.id; t.append(id); }
+    const p = document.createElement("span");
+    lab.append(opts.radio ? r : document.createElement("span"), t, p);
+    return lab;
+  }
+
+  function renderProducts(q, prod) {
+    const box = $("plist"); box.textContent = "";
+    const s = $("prodSearch").value.trim();
+    let list = E.scoreItems(catalog, s || q).slice(0, 5).map((x) => x.it);
+    if (prod && !list.some((it) => E.keyOf(it) === E.keyOf(prod))) list.unshift(prod);
+    $("prodHint").textContent = prod ? "Elegido" : (q.trim() ? "Ninguno elegido" : "");
+    const none = { t: "Ninguno (respuesta general)", p: 0 };
+    if (!list.length && !q.trim() && !s) { box.innerHTML = '<p class="hint">Aquí aparecen los productos de tu catálogo que coinciden con la pregunta.</p>'; return; }
+    list.forEach((it) => box.append(itemRow(it, { radio: true, checked: prod && E.keyOf(it) === E.keyOf(prod), onPick: () => { state.prodKey = E.keyOf(it); state.prodManual = true; update(); } })));
+    box.append(itemRow(none, { radio: true, checked: !prod, onPick: () => { state.prodKey = null; state.prodManual = true; update(); } }));
+    if (!list.length) box.insertAdjacentHTML("afterbegin", '<p class="hint">No encontré coincidencias. Busca el producto arriba.</p>');
+  }
+
+  function renderBank(q) {
+    const sims = bank.map((b) => ({ b, s: E.similarity(q, b.q) })).filter((x) => x.s >= 0.25).sort((a, b) => b.s - a.s).slice(0, 3);
+    $("bankPanel").hidden = !sims.length;
+    const box = $("bank"); box.textContent = "";
+    sims.forEach(({ b }) => {
+      const d = document.createElement("div"); d.className = "bitem";
+      const qq = document.createElement("div"); qq.className = "q"; qq.textContent = "«" + b.q + "»";
+      const a = document.createElement("div"); a.className = "a"; a.textContent = b.a;
+      const use = document.createElement("button"); use.className = "btn"; use.type = "button"; use.textContent = "Usar esta respuesta";
+      use.addEventListener("click", () => { $("answer").value = b.a; updateCount(); toast("Respuesta cargada. Revísala antes de copiar."); });
+      const row = document.createElement("div"); row.className = "row"; row.append(use);
+      d.append(qq, a, row); box.append(d);
+    });
+  }
+
+  function updateCount() {
+    const n = $("answer").value.length;
+    $("count").textContent = n + " / 2000";
+    $("count").classList.toggle("over", n > 2000);
+  }
+
+  let debounce;
+  $("q").addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(analyze, 180); });
+  $("prodSearch").addEventListener("input", () => update());
+  $("answer").addEventListener("input", updateCount);
+  $("clearQ").addEventListener("click", () => { $("q").value = ""; $("prodSearch").value = ""; state.prodManual = false; state.prodKey = null; $("ocrStatus").textContent = ""; analyze(); $("q").focus(); });
+  $("another").addEventListener("click", () => { state.seed++; update(); });
+
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch {
+      const ta = $("answer"); ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { return document.execCommand("copy"); } catch { return false; }
+    }
+  }
+  $("copy").addEventListener("click", async () => {
+    const a = $("answer").value.trim(), q = $("q").value.trim();
+    if (!a) { toast("No hay respuesta para copiar."); return; }
+    const ok = await copyText(a);
+    toast(ok ? "Copiada. Pégala en Mercado Libre." : "Seleccionada: toca Copiar en el menú.");
+    if (q) {
+      bank = [{ q: q.slice(0, 600), a, t: Date.now() }, ...bank.filter((b) => !(b.q === q.slice(0, 600) && b.a === a))].slice(0, 400);
+      store.set("bank", bank);
+    }
+  });
+
+  // ---- Leer captura (OCR en el teléfono; descarga el lector la primera vez)
+  let ocrWorker = null;
+  function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("load")); document.head.append(s); }); }
+  async function runOcr(file) {
+    const st = $("ocrStatus");
+    st.className = "status"; st.textContent = "Preparando el lector de capturas… (la primera vez tarda un poco)";
+    try {
+      if (!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+      if (!ocrWorker) ocrWorker = await Tesseract.createWorker("spa", 1, { logger: (m) => { if (m.status === "recognizing text") st.textContent = "Leyendo la captura… " + Math.round(m.progress * 100) + "%"; } });
+      st.textContent = "Leyendo la captura…";
+      const { data } = await ocrWorker.recognize(file);
+      const question = E.extractQuestion(data.text);
+      $("q").value = question;
+      const top = E.scoreItems(catalog, data.text)[0];
+      if (top && top.s >= 6) { state.prodKey = E.keyOf(top.it); state.prodManual = true; } else state.prodManual = false;
+      st.textContent = "Listo. Revisa que la pregunta se haya leído bien y corrígela si hace falta.";
+      analyze();
+    } catch (e) {
+      st.className = "status err";
+      st.textContent = "No se pudo leer la captura. Revisa tu conexión a internet (la primera vez descarga el lector) o pega la pregunta a mano.";
+    }
+  }
+  $("ocrBtn").addEventListener("click", () => $("ocrFile").click());
+  $("ocrFile").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runOcr(f); });
+  document.addEventListener("paste", (e) => {
+    const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+    if (item) { e.preventDefault(); runOcr(item.getAsFile()); }
+  });
+
+  // ---- Catálogo
+  function saveCatalog() { store.set("catalog", catalog); $("catBadge").textContent = catalog.length + " productos"; $("catCount").textContent = catalog.length + " productos"; }
+  function renderCatList() {
+    const box = $("catList"); box.textContent = "";
+    const s = $("catSearch").value.trim();
+    const list = s ? E.scoreItems(catalog, s).slice(0, 30).map((x) => x.it) : catalog.slice(0, 15);
+    if (!catalog.length) { box.innerHTML = '<p class="hint">El catálogo está vacío. Agrega productos abajo.</p>'; return; }
+    if (!list.length) { box.innerHTML = '<p class="hint">Nada coincide con esa búsqueda.</p>'; return; }
+    list.forEach((it) => box.append(itemRow(it, { radio: false })));
+    if (!s && catalog.length > 15) box.insertAdjacentHTML("beforeend", '<p class="hint">Mostrando 15 de ' + catalog.length + '. Usa el buscador para ver el resto.</p>');
+  }
+  $("catSearch").addEventListener("input", renderCatList);
+
+  function htmlToText(node) {
+    if (node.nodeType === 3) return node.nodeValue;
+    if (node.nodeType !== 1) return "";
+    const tag = node.tagName.toLowerCase();
+    if (["script", "style", "noscript", "svg", "head"].includes(tag)) return "";
+    let out = [...node.childNodes].map(htmlToText).join("");
+    if (tag === "a") {
+      const href = node.getAttribute("href") || "";
+      const m = href.match(/[?&#]wid=(MLA\d+)/i) || href.match(/\/(MLA-?\d{8,})(?:[-_/]|$)/i);
+      if (m && out.trim().length > 8) out = "\n" + out.trim() + " [id:" + m[1].replace("-", "").toUpperCase() + "]\n";
+    }
+    return /^(div|p|li|h\d|section|article|tr|ul|ol|br)$/.test(tag) ? "\n" + out + "\n" : out;
+  }
+  $("catPaste").addEventListener("paste", (e) => {
+    const html = e.clipboardData?.getData("text/html");
+    if (!html) return;
+    e.preventDefault();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const text = htmlToText(doc.body).replace(/[ \t ]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+    $("catPaste").value = ($("catPaste").value + "\n" + text).trim();
+  });
+  $("catAdd").addEventListener("click", () => {
+    const items = E.parseListing($("catPaste").value);
+    const st = $("catStatus");
+    if (!items.length) { st.className = "status err"; st.textContent = "No encontré productos con precio en ese texto. Copia la página del listado completa."; return; }
+    const map = new Map(catalog.map((it) => [E.keyOf(it), it]));
+    let nuevos = 0;
+    items.forEach((it) => { if (!map.has(E.keyOf(it))) nuevos++; map.set(E.keyOf(it), it); });
+    catalog = [...map.values()];
+    saveCatalog(); renderCatList();
+    $("catPaste").value = "";
+    st.className = "status"; st.textContent = items.length + " leídos: " + nuevos + " nuevos y " + (items.length - nuevos) + " actualizados.";
+  });
+  let clearArmed = 0;
+  $("catClear").addEventListener("click", () => {
+    if (Date.now() - clearArmed > 4000) { clearArmed = Date.now(); $("catClear").textContent = "¿Seguro? Toca otra vez"; setTimeout(() => ($("catClear").textContent = "Borrar catálogo"), 4000); return; }
+    clearArmed = 0; $("catClear").textContent = "Borrar catálogo";
+    catalog = []; saveCatalog(); renderCatList(); $("bkStatus").textContent = "Catálogo borrado.";
+  });
+  $("exportBtn").addEventListener("click", () => {
+    const data = JSON.stringify({ app: "respondedor-grig", v: 1, fecha: new Date().toISOString(), catalog, vehicles: guide, bank, settings }, null, 1);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    a.download = "respaldo-respondedor-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.append(a); a.click(); a.remove();
+    $("bkStatus").textContent = "Respaldo descargado.";
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (d.app !== "respondedor-grig") throw 0;
+      if (Array.isArray(d.catalog)) catalog = d.catalog;
+      if (Array.isArray(d.vehicles)) guide = d.vehicles;
+      if (Array.isArray(d.bank)) bank = d.bank;
+      if (d.settings) settings = { ...DEFAULTS, ...d.settings };
+      saveCatalog(); store.set("vehicles", guide); store.set("bank", bank); store.set("settings", settings);
+      loadSettingsForm(); renderVehicles(); renderCatList(); analyze();
+      $("bkStatus").textContent = "Respaldo cargado: " + catalog.length + " productos, " + guide.length + " vehículos, " + bank.length + " respuestas.";
+    } catch { $("bkStatus").textContent = "Ese archivo no es un respaldo de esta app."; }
+  });
+
+  // ---- Vehículos
+  function renderVehicles() {
+    const box = $("vList"); box.textContent = "";
+    $("vCount").textContent = guide.length + (guide.length === 1 ? " vehículo" : " vehículos");
+    if (!guide.length) { box.innerHTML = '<p class="hint">Todavía no agregaste vehículos propios. Los precargados de abajo ya funcionan.</p>'; return; }
+    guide.slice().sort((a, b) => a.veh.localeCompare(b.veh)).forEach((g) => {
+      const d = document.createElement("div"); d.className = "vrow";
+      const t = document.createElement("div");
+      const b = document.createElement("b"); b.textContent = g.veh;
+      const s = document.createElement("div"); s.className = "hint";
+      s.textContent = [g.visc, g.litros && g.litros + " L", g.fa && "Aceite: " + g.fa, g.fai && "Aire: " + g.fai, g.nota].filter(Boolean).join(" · ");
+      t.append(b, s);
+      const btns = document.createElement("div"); btns.className = "row";
+      const ed = document.createElement("button"); ed.className = "btn"; ed.type = "button"; ed.textContent = "Editar";
+      ed.addEventListener("click", () => { $("vName").value = g.veh; $("vVisc").value = g.visc || ""; $("vLit").value = g.litros || ""; $("vFa").value = g.fa || ""; $("vFai").value = g.fai || ""; $("vNota").value = g.nota || ""; $("vName").focus(); });
+      const del = document.createElement("button"); del.className = "btn link"; del.type = "button"; del.textContent = "Quitar";
+      del.addEventListener("click", () => { guide = guide.filter((x) => x !== g); store.set("vehicles", guide); renderVehicles(); analyze(); });
+      btns.append(ed, del);
+      d.append(t, btns); box.append(d);
+    });
+  }
+  function renderPre() {
+    const s = $("vPreSearch").value.trim();
+    const toks = E.tokens(s);
+    const list = E.VEHICLES.filter((v) => { const n = E.norm(E.vehName(v) + " " + v.y1 + " " + v.y2 + " " + v.comb + " " + v.visc); return toks.every((t) => n.includes(t)); });
+    $("vPreCount").textContent = E.VEHICLES.length + " motores";
+    const box = $("vPreList"); box.textContent = "";
+    list.slice(0, s ? 40 : 12).forEach((v) => {
+      const d = document.createElement("div"); d.className = "vrow";
+      const t = document.createElement("div");
+      const b = document.createElement("b"); b.textContent = E.vehName(v);
+      const h = document.createElement("div"); h.className = "hint";
+      h.textContent = [v.y1 + "-" + v.y2, v.comb, v.visc + (v.alt ? " / " + v.alt : ""), v.litros && v.litros + " L", v.norma].filter(Boolean).join(" · ");
+      t.append(b, h);
+      const ed = document.createElement("button"); ed.className = "btn"; ed.type = "button"; ed.textContent = "Editar";
+      ed.addEventListener("click", () => {
+        $("vName").value = v.marca + " " + v.modelos[0] + " " + v.motor.split(" ")[0]; $("vVisc").value = v.visc; $("vLit").value = v.litros || "";
+        $("vFa").value = ""; $("vFai").value = ""; $("vNota").value = v.norma ? "Norma " + v.norma : "";
+        $("vName").scrollIntoView({ block: "center" }); $("vName").focus();
+      });
+      d.append(t, ed); box.append(d);
+    });
+    if (!list.length) box.innerHTML = '<p class="hint">No hay vehículos precargados que coincidan.</p>';
+    else if (!s && list.length > 12) box.insertAdjacentHTML("beforeend", '<p class="hint">Mostrando 12 de ' + list.length + '. Usa el buscador para ver el resto.</p>');
+  }
+  $("vPreSearch").addEventListener("input", renderPre);
+
+  $("vSave").addEventListener("click", () => {
+    const veh = $("vName").value.trim();
+    if (!veh) { $("vStatus").textContent = "Escribe el vehículo, por ejemplo Peugeot 208 1.6."; return; }
+    const g = { veh, visc: $("vVisc").value.trim(), litros: $("vLit").value.trim(), fa: $("vFa").value.trim(), fai: $("vFai").value.trim(), nota: $("vNota").value.trim() };
+    guide = [g, ...guide.filter((x) => E.norm(x.veh) !== E.norm(veh))];
+    store.set("vehicles", guide);
+    ["vName", "vVisc", "vLit", "vFa", "vFai", "vNota"].forEach((id) => ($(id).value = ""));
+    $("vStatus").textContent = "Guardado: " + veh;
+    renderVehicles(); analyze();
+  });
+
+  // ---- Ajustes
+  const SET_FIELDS = { sTrato: "trato", sLink: "link", sDespedida: "despedida", sEnvio: "envio", sFactura: "factura", sPago: "pago", sOriginal: "original", sDevolucion: "devolucion" };
+  function loadSettingsForm() { Object.entries(SET_FIELDS).forEach(([id, k]) => ($(id).value = settings[k] ?? "")); }
+  Object.entries(SET_FIELDS).forEach(([id, k]) => $(id).addEventListener("input", () => { settings[k] = $(id).value; store.set("settings", settings); update(); }));
+  $("resetSettings").addEventListener("click", () => { settings = { ...DEFAULTS, trato: settings.trato, link: settings.link }; store.set("settings", settings); loadSettingsForm(); update(); toast("Textos restablecidos."); });
+
+  // ---- Inicio: ejemplo para que se vea cómo funciona
+  loadSettingsForm(); saveCatalog(); renderVehicles(); renderPre();
+  $("q").value = store.get("seenExample", false) ? "" : "Hola, ¿qué aceite y filtro lleva mi Peugeot 308 1.6 THP 2015? ¿Tienen stock?";
+  store.set("seenExample", true);
+  analyze();
+})();
+</script>
+</body>
+</html>
