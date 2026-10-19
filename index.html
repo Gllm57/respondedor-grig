@@ -360,7 +360,7 @@ const Engine = (() => {
     return catalog.map((it) => {
       prep(it);
       let s = 0;
-      for (const t of toks) if (viscs.has(t) ? hasVisc(it._n, t) : it._n.includes(t)) s += viscs.has(t) ? 5 : t.length > 3 ? 2 : 1;
+      for (const t of toks) if (viscs.has(t) ? hasVisc(it._n, t) : it._n.includes(t)) s += viscs.has(t) ? 5 : t.length >= 3 ? 2 : 1;
       if (viscs.size && ![...viscs].some((v) => hasVisc(it._n, v))) s -= 3;
       if (s > 0) s -= 0.05 * tokens(it.t).filter((t) => !toks.includes(t)).length;
       return { it, s };
@@ -566,7 +566,9 @@ const Engine = (() => {
       const need = g.litros ? parseFloat(String(g.litros).replace(",", ".")) : 4;
       const qt = tokens(q).filter((t) => t.length > 3);
       const oils = catalog.filter((it) => { prep(it); return hasVisc(it._n, gv) && !/filtro|\b(2t|4t|moto)\b/.test(it._n); });
-      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0); };
+      // La norma del fabricante (ej. VW 507.00) en el título pesa más que el tamaño del envase
+      const normaT = g.norma ? tokens(g.norma).filter((t) => /\d/.test(t) && t.length >= 3) : [];
+      const sc = (it) => { const l = litersOf(it.t) || 0; return (l >= need ? 3 : 0) - Math.abs(l - need) / 10 + (qt.some((b) => it._n.includes(b)) ? 2 : 0) + (normaT.some((t) => it._n.includes(t)) ? 4 : 0); };
       res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
     }
     const byCat = {};
