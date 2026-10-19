@@ -62,6 +62,8 @@ textarea { resize: vertical; }
 .facts { display: grid; gap: 4px; font-size: .88rem; }
 .facts b { font-weight: 600; }
 .facts .warn { color: var(--warn); }
+.facts .oil { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 4px 8px; border-radius: 6px; }
+.facts .oil a { color: inherit; font-weight: 600; }
 .plist { display: grid; }
 .pitem { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; cursor: pointer; }
 .pitem:first-child { border-top: 0; }
@@ -1175,6 +1177,19 @@ const Engine = (() => {
         const parts = [combo.oil && "aceite: " + E.prodName(combo.oil.t), ...combo.filters.map((x) => "filtro de " + x.cat + ": " + E.prodName(x.it.t))].filter(Boolean);
         fact("Combo en tu catálogo", parts.length ? parts.join(" · ") : "no encontré productos que nombren este vehículo", parts.length ? "" : "warn");
       }
+      // Aceite: cuál es el que se va a ofrecer (con su link), para ubicarlo de un vistazo
+      const oilAsked = /\baceites?\b/.test(E.norm(q).replace(/filtros? (de |del |para )?aceite/g, "")) || E.viscOf(q).length || pv;
+      const oilIt = alt || (prod && !/filtro/i.test(prod.t) && pv ? prod : combo.oil);
+      const wantV = gv || E.viscOf(q)[0];
+      if (oilIt && oilAsked) {
+        const d = document.createElement("div"), b = document.createElement("b"), a = document.createElement("a"); d.className = "oil";
+        b.textContent = "Aceite: "; a.textContent = E.prodName(oilIt.t); a.target = "_blank"; a.rel = "noopener";
+        a.href = E.linkOf(oilIt);
+        const ov = E.viscOf(oilIt.t)[0], ol = E.litersOf(oilIt.t);
+        d.append(b, a, [ov && ov.toUpperCase().replace("W", "W-"), ol && String(ol).replace(".", ",") + " L", alt && "(el indicado; el elegido no corresponde)"].filter(Boolean).map((x) => " · " + x).join(""));
+        f.append(d);
+      } else if (oilAsked && veh && veh.model && m.options.length > 1 && !g) fact("Aceite", "depende del motor: falta año y motor", "warn");
+      else if (oilAsked && wantV) fact("Aceite", "no encontré un " + wantV.toUpperCase().replace("W", "W-") + " en tu catálogo", "warn");
       const filterQ = intents.has("filtros") || intents.has("combo") || intents.has("equivalencia");
       if (filterQ && veh && veh.model && veh.year && (veh.engine || /\d+cc/.test(veh.label)) && !combo.filters.length && !E.parseCodes($("framCode").value).length && !(prod && /filtro/i.test(prod.t)))
         fact("Ojo", "no encontré filtros para este vehículo en tu catálogo, así que la respuesta dice que no hay stock. Si lo tienes, escribe el código Fram.", "warn");
