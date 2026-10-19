@@ -333,7 +333,7 @@ const Engine = (() => {
     { key: "devolucion", label: "Devolución", re: /(devoluc|devolver|cambio|garantia|no me sirve)/ },
     { key: "aceite", label: "Aceite", re: /(?<!filtros? (de |del |para )?)\baceites?\b|\b\d{1,2}w\d{2}\b|\blubricante/ },
     { key: "filtros", label: "Filtros", re: /filtro/ },
-    { key: "kit", label: "Kit de filtros", re: /(\bkit\b|juego de \d? ?filtros|combo de filtros|todos los filtros|los 3 filtros|los tres filtros)/ },
+    { key: "kit", label: "Kit de filtros", re: /(\bkit\b|juego (de )?\d? ?filtros|combo de filtros|todos los filtros|los 3 filtros|los tres filtros)/ },
     { key: "combo", label: "Combo / service", re: /(combo|incluye|viene con|todo lo (que|necesario)|service|cambio de aceite y filtro)/ },
   ];
   function detectIntents(q) {
@@ -542,7 +542,7 @@ const Engine = (() => {
     ["indicanos", "indícanos"], ["pasanos", "pásanos"], ["consultanos", "consúltanos"], ["avisanos", "avísanos"], ["cargá", "carga"], ["fijate", "fíjate"],
     ["elegí", "elige"], ["vas a necesitar", "necesitarás"], ["contás", "cuentas"], ["escribinos", "escríbenos"], ["sumá", "suma"]];
   // Trato de usted, como responde la tienda ("su vehículo", "me podría indicar")
-  const USTED = [["vas a necesitar", "va a necesitar"], ["nos confirmás", "nos confirma"], ["nos decís", "nos dice"], ["nos pasás", "nos pasa"], ["nos indicás", "nos indica"],
+  const USTED = [["vas a necesitar", "va a necesitar"], ["agregues", "agregue"], ["efectúes", "efectúe"], ["nos confirmás", "nos confirma"], ["nos decís", "nos dice"], ["nos pasás", "nos pasa"], ["nos indicás", "nos indica"],
     ["disculpá", "disculpe"], ["podés", "puede"], ["tenés", "tiene"], ["indicás", "indica"], ["querés", "quiere"], ["pasás", "pasa"], ["necesitás", "necesita"], ["contás", "cuenta"],
     ["confirmás", "confirma"], ["decís", "dice"], ["indicanos", "indíquenos"], ["pasanos", "pásenos"], ["consultanos", "consúltenos"], ["avisanos", "avísenos"],
     ["escribinos", "escríbanos"], ["cargá", "cargue"], ["fijate", "fíjese"], ["elegí", "elija"], ["sumá", "sume"], ["podrías", "podría"],
@@ -723,7 +723,7 @@ const Engine = (() => {
     catalog.forEach((it) => {
       prep(it);
       if (!/filtro/.test(it._n)) return;
-      const kind = /\bkit\b|juego de \d? ?filtros/.test(it._n) ? "kit" : filterCat(it._n) || "otro";
+      const kind = /\bkit\b|juego (de )?\d? ?filtros/.test(it._n) ? "kit" : filterCat(it._n) || "otro";
       const code = framCodeOf(it.t);
       vehiclesInTitle(it.t).forEach((v) => {
         const k = v.brand + "|" + v.model;
@@ -753,11 +753,17 @@ const Engine = (() => {
       res.oil = oils.sort((a, b) => sc(b) - sc(a))[0] || null;
     }
     const byCat = {};
+    const vq = norm(q + " " + veh.label);
+    const vehDiesel = (g && g.comb === "diesel") || /diesel|gasoil|\b(tdi|hdi|dci|tdci|crdi|jtd|td|d4d)\b/.test(vq);
+    const vehNafta = !vehDiesel && ((g && g.comb === "nafta") || /\bnaft/.test(vq));
     catalog.forEach((it) => {
       prep(it);
       if (!/filtro/.test(it._n) || !mt.every((t) => has(it._n, t)) || !filterFits(it, veh)) return;
-      if (/\bkit\b|juego de \d? ?filtros/.test(it._n)) { res.kits.push(it); return; }
+      if (/\bkit\b|juego (de )?\d? ?filtros/.test(it._n)) { res.kits.push(it); return; }
       const c = filterCat(it._n);
+      // No mezclar diésel y nafta (ej. al Corsa 1.4 nafta no se le ofrece el filtro de gasoil del Corsa diésel)
+      const itD = /diesel|gasoil|gas oil|\b(tdi|hdi|dci|tdci|crdi|jtd|td)\b/.test(it._n);
+      if ((vehNafta && itD) || (vehDiesel && /\bnafta\b/.test(it._n))) return;
       if (c) (byCat[c] = byCat[c] || []).push(it);
     });
     // Si la pregunta nombra un tipo de filtro, solo ese
@@ -904,17 +910,23 @@ const Engine = (() => {
       const missF = [!veh.year && "año", !(veh.engine || /\d+cc/.test(veh.label)) && "motor"].filter(Boolean).join(" y ");
       const askMiss = () => { out.length = 1; out.push("¿Me podrías indicar el " + missF + " de tu " + veh.label + "?"); return finish(); };
       const kits = combo.kits || [];
-      if (intents.has("kit")) {
+      // "los filtros" sin decir cuál: se ofrece el kit, y si no hay kit, cada filtro con su publicación
+      const typedF = /filtros? (de |del |para el |para )?(aceite|aire|combustible|nafta|gas\s?oil|habitaculo|polen|cabina)/.test(norm(q));
+      const generalF = intents.has("filtros") && !typedF && !intents.has("combo") && !fram.length;
+      if (intents.has("kit") || generalF) {
         const needEngineK = !(veh.engine || /\d+cc/.test(veh.label)) && engineVariants(veh) > 1;
         if (missF && (kits.length > 1 || needEngineK || (!kits.length && (combo.ambiguous || !combo.filters.length)))) return askMiss();
-        out.length = 1;
+        if (intents.has("kit")) out.length = 1;
+        else for (let i = out.length - 1; i > 0; i--) if (/^Sí, (hay stock|tenemos|el .* está disponible|contamos)/.test(out[i])) out.splice(i, 1);
         // "kit de 4 filtros": se prefiere el kit con esa cantidad
         const nk = { dos: "2", tres: "3", cuatro: "4" }[(norm(q).match(/\b(\d|dos|tres|cuatro) filtros/) || [])[1]] || (norm(q).match(/\b(\d) filtros/) || [])[1];
         const kitsN = nk ? kits.filter((k) => new RegExp("\\b(kit|juego)( de)? " + nk + "\\b").test(norm(k.t))) : [];
         const pool = kitsN.length ? kitsN : kits;
         const kit = pool.find((k) => !veh.engine || norm(k.t).includes(veh.engine)) || pool[0];
         if (kit) out.push("Para tu " + veh.label + " tenemos el " + prodName(kit.t) + "." + lk(kit));
-        else if (combo.filters.length) out.push("No tenemos el kit armado para tu " + veh.label + ", pero tenemos los filtros por separado: " + combo.filters.map((f) => "el de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+        else if (combo.filters.length > 1) out.push("No tenemos el kit armado para tu " + veh.label + ", pero tenemos los filtros en publicaciones separadas. Te paso los links para que los agregues al carrito y efectúes la compra: " + combo.filters.map((f) => "el filtro de " + f.cat + " " + filterName(f.it.t) + lk(f.it)).join(", ") + ".");
+        else if (combo.filters.length) out.push("Para tu " + veh.label + " tenemos el filtro de " + combo.filters[0].cat + " " + filterName(combo.filters[0].it.t) + "." + lk(combo.filters[0].it));
+        else if (out.length > 1) out.push("Los filtros para tu " + veh.label + " no los tenemos en stock en estos momentos.");
         else return noStock();
         return finish();
       }
